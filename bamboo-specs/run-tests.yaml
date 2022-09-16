@@ -1,0 +1,79 @@
+---
+version: 2
+
+plan:
+  project-key: CL
+  key: VLERT
+  name: VpnLibsEndpoint - Run Tests
+
+stages:
+  - Run tests:
+      manual: false
+      final: false
+      jobs:
+        - Test on Linux
+        - Test on macOS
+
+Test on Linux:
+  key: BL
+  docker:
+    image: adguard/core-libs:latest
+    volumes:
+      ${bamboo.working.directory}: ${bamboo.working.directory}
+      ${bamboo.tmp.directory}: ${bamboo.tmp.directory}
+    docker-run-arguments: [ ]
+  tasks:
+    - !include docker-clean.yaml
+    - checkout:
+        description: Checkout Default Repository
+        force-clean-build: 'true'
+    - script:
+        interpreter: SHELL
+        scripts:
+          - |-
+            set -x -e
+            cargo test
+            cd lib
+            cargo test
+  requirements:
+    - adg-privileged-docker
+  artifact-subscriptions: [ ]
+
+Test on macOS:
+  key: BM
+  tasks:
+    - checkout:
+        description: Checkout Default Repository
+        force-clean-build: 'true'
+    - script:
+        interpreter: SHELL
+        scripts:
+          - |-
+            set -x -e
+            cargo test
+            cd lib
+            cargo test
+  requirements:
+    - macOS 11.0 or later
+  artifact-subscriptions: [ ]
+
+repositories:
+  - core-libs/vpn-libs-endpoint:
+      scope: global
+
+branches:
+  create: for-pull-request
+  delete:
+    after-deleted-days: 4
+    after-inactive-days: 30
+  integration:
+    push-on-success: false
+    merge-from: master
+  link-to-jira: true
+
+notifications: [ ]
+
+labels: [ ]
+
+other:
+  concurrent-build-plugin: system-default

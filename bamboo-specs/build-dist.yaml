@@ -1,0 +1,116 @@
+---
+version: 2
+triggers: [ ]
+
+plan:
+  project-key: CL
+  key: VLEBD
+  name: VpnLibsEndpoint - Build Distribution
+
+stages:
+  - Build artifacts:
+      manual: false
+      final: false
+      jobs:
+        - Build on Linux
+        - Build on macOS
+  - Build distribution:
+      manual: false
+      final: false
+      jobs:
+        - Build distribution
+
+Build on Linux:
+  key: BL
+  docker:
+    image: adguard/core-libs:latest
+    volumes:
+      ${bamboo.working.directory}: ${bamboo.working.directory}
+      ${bamboo.tmp.directory}: ${bamboo.tmp.directory}
+    docker-run-arguments: [ ]
+  tasks:
+    - !include docker-clean.yaml
+    - checkout:
+        description: Checkout Default Repository
+        force-clean-build: 'true'
+    - script:
+        interpreter: SHELL
+        scripts:
+          - |-
+            set -x -e
+            cargo build --release --target x86_64-unknown-linux-gnu
+            cp target/x86_64-unknown-linux-gnu/vpn_endpoint target/vpn_endpoint.linux-x86_64
+  requirements:
+    - adg-privileged-docker
+  artifact-subscriptions: [ ]
+  artifacts:
+    - name: Build result Linux
+      location: target
+      pattern: 'vpn_endpoint.linux-x86_64'
+      required: false
+      shared: true
+
+Build on macOS:
+  key: BM
+  tasks:
+    - checkout:
+        description: Checkout Default Repository
+        force-clean-build: 'true'
+    - script:
+        interpreter: SHELL
+        scripts:
+          - |-
+            set -x -e
+            cargo build --release --target x86_64-apple-darwin
+            cp target/x86_64-apple-darwin/vpn_endpoint target/vpn_endpoint.macos-x86_64
+  requirements:
+    - macOS 11.0 or later
+  artifact-subscriptions: [ ]
+  artifacts:
+    - name: Build result macOS
+      location: target
+      pattern: 'vpn_endpoint.macos-x86_64'
+      required: false
+      shared: true
+
+Build distribution:
+  key: BD
+  tasks:
+    - checkout:
+        description: Checkout Default Repository
+        force-clean-build: 'true'
+    - script:
+        interpreter: SHELL
+        scripts:
+          - |-
+            set -x -e
+            VERSION=$(cat Cargo.toml | grep "version = " | head -n 1 | sed -e 's/version = "\(.*\)"/\1/')
+            zip vpn_endpoint-$VERSION.zip vpn-endpoint-build-results/*
+  requirements:
+    - macOS 11.0 or later
+  artifact-subscriptions:
+    - artifact: Build result Linux
+      destination: vpn-endpoint-build-results
+    - artifact: Build result macOS
+      destination: vpn-endpoint-build-results
+  artifacts:
+    - name: Build result macOS
+      location: .
+      pattern: 'vpn_endpoint-*.zip'
+      required: false
+
+repositories:
+  - core-libs/vpn-libs-endpoint:
+      scope: global
+
+branches:
+  create: manually
+  delete: never
+  link-to-jira: true
+
+notifications: [ ]
+
+labels: [ ]
+
+other:
+  concurrent-build-plugin: system-default

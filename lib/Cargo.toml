@@ -7,6 +7,7 @@ edition = "2021"
 [lib]
 name = "vpn_libs_endpoint"
 path = "src/lib.rs"
+doctest = false
 
 [build-dependencies]
 cc = "1.0"

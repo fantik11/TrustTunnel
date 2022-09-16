@@ -6,6 +6,7 @@ edition = "2021"
 
 [[bin]]
 name = "vpn_endpoint"
+doctest = false
 
 [workspace]
 # The empty workspace prevents redundant builds of each component
