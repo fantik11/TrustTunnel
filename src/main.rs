@@ -25,38 +25,44 @@ fn main() {
             clap::Arg::new(VERSION_PARAM_NAME)
                 .short('v')
                 .long("version")
+                .action(clap::ArgAction::SetTrue)
                 .help("Print the version of this software and exit"),
             clap::Arg::new(LOG_LEVEL_PARAM_NAME)
                 .short('l')
                 .long("loglvl")
-                .takes_value(true)
-                .possible_values(["info", "debug", "trace"])
+                .action(clap::ArgAction::Set)
+                .value_parser(["info", "debug", "trace"])
                 .default_value("info")
                 .help("Logging level"),
             clap::Arg::new(LOG_FILE_PARAM_NAME)
                 .long("logfile")
-                .takes_value(true)
+                .action(clap::ArgAction::Set)
                 .help("File path for storing logs. If not specified, the logs are printed to stdout"),
             clap::Arg::new(SENTRY_DSN_PARAM_NAME)
                 .long(SENTRY_DSN_PARAM_NAME)
-                .takes_value(true)
+                .action(clap::ArgAction::Set)
                 .help("Sentry DSN (see https://docs.sentry.io/product/sentry-basics/dsn-explainer/ for details)"),
             clap::Arg::new(CONFIG_PARAM_NAME)
-                .takes_value(true)
+                .action(clap::ArgAction::Set)
                 .required_unless_present(VERSION_PARAM_NAME)
                 .help("Path to a configuration file"),
         ])
         .disable_version_flag(true)
         .get_matches();
 
-    if args.is_present(VERSION_PARAM_NAME) {
+    if args.contains_id(VERSION_PARAM_NAME)
+        && Some(true) == args.get_one::<bool>(VERSION_PARAM_NAME).copied()
+    {
         println!("{}", VERSION_STRING);
         return;
     }
 
-    let _guard = args.value_of(SENTRY_DSN_PARAM_NAME)
+    #[cfg(feature = "console-subscriber")]
+    console_subscriber::init();
+
+    let _guard = args.get_one::<String>(SENTRY_DSN_PARAM_NAME)
         .map(|x| sentry::init((
-            x,
+            x.clone(),
             sentry::ClientOptions {
                 release: sentry::release_name!(),
                 ..Default::default()
@@ -64,13 +70,13 @@ fn main() {
         )));
 
     let _guard = logging::LogFlushGuard;
-    log::set_logger(match args.value_of(LOG_FILE_PARAM_NAME) {
+    log::set_logger(match args.get_one::<String>(LOG_FILE_PARAM_NAME) {
         None => logging::make_stdout_logger(),
         Some(file) => logging::make_file_logger(file)
             .expect("Couldn't open the logging file"),
     }).expect("Couldn't set logger");
 
-    log::set_max_level(match args.value_of(LOG_LEVEL_PARAM_NAME) {
+    log::set_max_level(match args.get_one::<String>(LOG_LEVEL_PARAM_NAME).map(String::as_str) {
         None => LevelFilter::Info,
         Some("info") => LevelFilter::Info,
         Some("debug") => LevelFilter::Debug,
@@ -78,7 +84,7 @@ fn main() {
         Some(x) => panic!("Unexpected log level: {}", x),
     });
 
-    let config_path = args.value_of(CONFIG_PARAM_NAME).unwrap();
+    let config_path = args.get_one::<String>(CONFIG_PARAM_NAME).unwrap();
     let parsed: Settings = serde_json::from_reader(BufReader::new(
         File::open(config_path).expect("Couldn't open the configuration file")
     )).expect("Failed parsing the configuration file");

@@ -62,6 +62,10 @@ struct StreamSink {
     writable_event_rx: mpsc::Receiver<()>,
     /// Sends messages to [`Http3Codec.stream_event_rx`]
     codec_tx: Arc<mpsc::UnboundedSender<StreamMessage>>,
+    /// Equals to [`net_utils::MIN_USABLE_QUIC_STREAM_CAPACITY`] by default.
+    /// In some cases may be assigned to different values
+    /// (see [`StreamSink::wait_writable()`]) to avoid busy loops.
+    data_frame_overhead: usize,
     id: log_utils::IdChain<u64>,
 }
 
@@ -143,7 +147,7 @@ impl Http3Codec {
         let (writable_tx, writable_rx) = mpsc::channel(1);
 
         let id = self.parent_id_chain.extended(log_utils::IdItem::new(
-            log_utils::CONNECTION_ID_FMT, stream_id
+            log_utils::CONNECTION_ID_FMT, stream_id,
         ));
 
         self.streams.insert(stream_id, Stream {
@@ -167,8 +171,9 @@ impl Http3Codec {
                 socket: self.socket.clone(),
                 writable_event_rx: writable_rx,
                 codec_tx: self.codec_tx.clone(),
+                data_frame_overhead: net_utils::MIN_USABLE_QUIC_STREAM_CAPACITY,
                 id,
-            }
+            },
         }))
     }
 
@@ -181,7 +186,7 @@ impl Http3Codec {
             // multiple `readable` messages in the queue
             Ok(_) | Err(mpsc::error::TrySendError::Full(_)) => Ok(()),
             Err(e) => Err(io::Error::new(
-                ErrorKind::Other, format!("Failed to send stream readable event: {}", e)
+                ErrorKind::Other, format!("Failed to send stream readable event: {}", e),
             )),
         }
     }
@@ -195,7 +200,7 @@ impl Http3Codec {
                 Ok((cap, _)) if cap < net_utils::MIN_USABLE_QUIC_STREAM_CAPACITY => {
                     self.socket.notify_stream_waiting_writable(stream_id);
                     Ok(())
-                },
+                }
                 Ok((_, stream)) => {
                     match stream.writable_event_tx.try_send(()) {
                         // `Full` is not considered as an error in this case, as the stream does not need
@@ -347,7 +352,7 @@ impl pipe::Source for StreamSource {
 impl Drop for StreamSource {
     fn drop(&mut self) {
         match self.codec_tx.send(StreamMessage::Shutdown(
-            self.stream_id, Some(quiche::Shutdown::Read)
+            self.stream_id, Some(quiche::Shutdown::Read),
         )) {
             Ok(_) => (),
             Err(e) => log_id!(debug, self.id, "Failed to notify of read shutdown: {}", e),
@@ -361,7 +366,7 @@ impl http_codec::PendingRespond for StreamSink {
     }
 
     fn send_response(self: Box<Self>, response: ResponseHeaders, eof: bool)
-        -> io::Result<Box<dyn http_codec::RespondedStreamSink>>
+                     -> io::Result<Box<dyn http_codec::RespondedStreamSink>>
     {
         log_id!(debug, self.id, "Sending response: {:?} (eof={})", response, eof);
 
@@ -370,7 +375,7 @@ impl http_codec::PendingRespond for StreamSink {
         if eof {
             self.codec_tx.send(StreamMessage::Shutdown(self.stream_id, None))
                 .map_err(|e| io::Error::new(
-                    ErrorKind::Other, format!("Failed to send shutdown message: {}", e)
+                    ErrorKind::Other, format!("Failed to send shutdown message: {}", e),
                 ))?;
         }
 
@@ -395,7 +400,21 @@ impl pipe::Sink for StreamSink {
     }
 
     fn write(&mut self, data: Bytes) -> io::Result<Bytes> {
-        self.socket.write(self.stream_id, data)
+        let orig_len = data.len();
+        let data = self.socket.write(self.stream_id, data)?;
+
+        self.data_frame_overhead = if data.len() == orig_len {
+            // Quiche does not shrink the chunk according to stream capacity. Instead, it
+            // checks the capacity against `overhead(data.len())` and may return
+            // [`quiche::h3::Error::Done`]. As the next `stream_capacity()` call may return
+            // a value between `net_utils::quic_data_frame_overhead(1)` and
+            // `net_utils::quic_data_frame_overhead(orig_len)` this workaround helps us
+            // not fall in a busy loop.
+            net_utils::quic_data_frame_overhead(orig_len)
+        } else {
+            net_utils::quic_data_frame_overhead(1)
+        };
+        Ok(data)
     }
 
     fn eof(&mut self) -> io::Result<()> {
@@ -406,20 +425,17 @@ impl pipe::Sink for StreamSink {
     async fn wait_writable(&mut self) -> io::Result<()> {
         loop {
             match self.socket.stream_capacity(self.stream_id) {
-                Ok(n) if n >= net_utils::MIN_USABLE_QUIC_STREAM_CAPACITY => {
-                    return Ok(())
-                },
+                Ok(n) if n > self.data_frame_overhead => return Ok(()),
                 Ok(_) => {
-                    if self.codec_tx.send(StreamMessage::WaitingWritable(self.stream_id)).is_err() {
-                        return Err(io::Error::from(ErrorKind::UnexpectedEof));
-                    }
+                    self.codec_tx.send(StreamMessage::WaitingWritable(self.stream_id))
+                        .map_err(|_| io::Error::from(ErrorKind::UnexpectedEof))?;
                     match self.writable_event_rx.recv().await {
                         None => return Err(io::Error::from(ErrorKind::UnexpectedEof)),
                         Some(_) => continue,
                     }
                 }
                 Err(e) => return Err(io::Error::new(
-                    ErrorKind::Other, e.to_string()
+                    ErrorKind::Other, e.to_string(),
                 )),
             }
         }
@@ -429,7 +445,7 @@ impl pipe::Sink for StreamSink {
 impl http_codec::DroppingSink for StreamSink {
     fn write(&mut self, data: Bytes) -> io::Result<datagram_pipe::SendStatus> {
         match self.socket.stream_capacity(self.stream_id) {
-            Ok(n) if n >= data_frame_overhead(data.len()) + data.len() => (),
+            Ok(n) if n >= net_utils::quic_data_frame_overhead(data.len()) + data.len() => (),
             Ok(_) => return Ok(datagram_pipe::SendStatus::Dropped),
             Err(e) => return Err(io::Error::new(ErrorKind::Other, e.to_string())),
         }
@@ -437,7 +453,7 @@ impl http_codec::DroppingSink for StreamSink {
         let unsent = self.socket.write(self.stream_id, data)?;
         if !unsent.is_empty() {
             return Err(io::Error::new(
-                ErrorKind::Other, "Packet was sent partially while should've been sent entirely"
+                ErrorKind::Other, "Packet was sent partially while should've been sent entirely",
             ));
         }
         Ok(datagram_pipe::SendStatus::Sent)
@@ -447,14 +463,10 @@ impl http_codec::DroppingSink for StreamSink {
 impl Drop for StreamSink {
     fn drop(&mut self) {
         match self.codec_tx.send(StreamMessage::Shutdown(
-            self.stream_id, Some(quiche::Shutdown::Write)
+            self.stream_id, Some(quiche::Shutdown::Write),
         )) {
             Ok(_) => (),
             Err(e) => log_id!(debug, self.id, "Failed to notify of write shutdown: {}", e),
         }
     }
-}
-
-const fn data_frame_overhead(payload_size: usize) -> usize {
-    net_utils::QUIC_DATA_FRAME_ID_WIRE_LENGTH + net_utils::varint_len(payload_size)
 }

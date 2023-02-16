@@ -75,6 +75,7 @@ enum SocketMessage {
 
 struct HandshakingConnection {
     quic_conn: Arc<std::sync::Mutex<QuicConnection>>,
+    local_address: SocketAddr,
 }
 
 struct EstablishedConnection {
@@ -240,7 +241,7 @@ impl QuicMultiplexer {
         };
 
         let (mut result, quic_conn) = match result {
-            Ok((sock, conn)) => (Ok(sock), Some(conn.clone())),
+            Ok((sock, conn)) => (Ok(sock), Some(conn)),
             Err(e) => {
                 log_id!(debug, self.id, "Failed to process QUIC packet: header={:?}, error={}", header, e);
                 match self.connections.get(&header.dcid) {
@@ -286,31 +287,31 @@ impl QuicMultiplexer {
                 .is_some()
             => Ok(ServerNameCheckStatus::Ok),
             Some(x) if settings.ping_tls_host_info.as_ref().map_or(
-                false, |info| info.hostname == x
+                false, |info| info.hostname == x,
             ) =>
                 Ok(ServerNameCheckStatus::RetryAs(
                     settings.ping_tls_host_info.as_ref().unwrap(),
                 )),
             Some(x) if settings.speed_tls_host_info.as_ref().map_or(
-                false, |info| info.hostname == x
+                false, |info| info.hostname == x,
             ) =>
                 Ok(ServerNameCheckStatus::RetryAs(
                     settings.speed_tls_host_info.as_ref().unwrap(),
                 )),
             Some(x) if settings.reverse_proxy.as_ref().map_or(
-                false, |s| s.tls_info.hostname == x
+                false, |s| s.tls_info.hostname == x,
             ) =>
                 Ok(ServerNameCheckStatus::RetryAs(
                     &settings.reverse_proxy.as_ref().unwrap().tls_info,
                 )),
             x => return Err(io::Error::new(
-                ErrorKind::Other, format!("Unexpected server name in TLS handshake: {:?}", x)
+                ErrorKind::Other, format!("Unexpected server name in TLS handshake: {:?}", x),
             )),
         }
     }
 
-    fn on_unknown_quic_packet<'a>(&self, peer: &SocketAddr, header: &quiche::Header<'a>)
-        -> io::Result<UnknownPacketStatus>
+    fn on_unknown_quic_packet(&self, peer: &SocketAddr, header: &quiche::Header<'_>)
+                              -> io::Result<UnknownPacketStatus>
     {
         if !matches!(header.ty, quiche::Type::Initial) {
             return Err(io::Error::new(ErrorKind::Other, format!("Unexpected packet type: {:?}", header)));
@@ -348,7 +349,7 @@ impl QuicMultiplexer {
             let mut out = [0; net_utils::MAX_DATAGRAM_SIZE];
             let n = quiche::retry(
                 &header.scid, &header.dcid, &scid,
-                &mint_token(header, &self.token_prefix, peer), header.version, &mut out
+                &mint_token(header, &self.token_prefix, peer), header.version, &mut out,
             )
                 .map_err(|e|
                     io::Error::new(ErrorKind::Other, format!("Retry failed: {}", e))
@@ -378,21 +379,22 @@ impl QuicMultiplexer {
             &tls_host_info.private_key_path,
         )
             .map_err(|e| io::Error::new(
-                ErrorKind::Other, format!("Failed to create QUIC configuration: {}", e)
+                ErrorKind::Other, format!("Failed to create QUIC configuration: {}", e),
             ))?;
-        let mut quic_conn = quiche::accept(scid, odcid, *peer, &mut quic_config)
+        let local_address = self.core_settings.listen_address;
+        let mut quic_conn = quiche::accept(scid, odcid, local_address, *peer, &mut quic_config)
             .map_err(|e| io::Error::new(
-                ErrorKind::Other, format!("Failed to accept QUIC connection: {}", e)
+                ErrorKind::Other, format!("Failed to accept QUIC connection: {}", e),
             ))?;
 
-        quic_recv(&mut quic_conn, packet, &quiche::RecvInfo { from: *peer }, &self.id)?;
+        quic_recv(&mut quic_conn, packet, &quiche::RecvInfo { from: *peer, to: local_address }, &self.id)?;
 
         Ok(quic_conn)
     }
 
-    fn finalize_established_connection<'a>(
+    fn finalize_established_connection(
         &mut self,
-        conn_id: &quiche::ConnectionId<'a>,
+        conn_id: &quiche::ConnectionId<'_>,
         conn: HandshakingConnection,
         peer: &SocketAddr,
     ) -> io::Result<(QuicSocket, Arc<std::sync::Mutex<QuicConnection>>)> {
@@ -403,7 +405,7 @@ impl QuicMultiplexer {
             let h3_config = h3::Config::new().unwrap();
             let h3_conn = h3::Connection::with_transport(&mut quic_conn, &h3_config)
                 .map_err(|e| io::Error::new(
-                    ErrorKind::Other, format!("Failed to open HTTP3 session: {}", e)
+                    ErrorKind::Other, format!("Failed to open HTTP3 session: {}", e),
                 ))?;
 
             flush_pending_data(&mut quic_conn, &self.socket, peer, &self.id)?;
@@ -426,15 +428,15 @@ impl QuicMultiplexer {
                 h3_conn,
                 waiting_writable_streams: Default::default(),
                 id: self.id.extended(log_utils::IdItem::new(
-                    SOCKET_ID_FMT, self.next_socket_id.fetch_add(1, Ordering::Relaxed)
+                    SOCKET_ID_FMT, self.next_socket_id.fetch_add(1, Ordering::Relaxed),
                 )),
-           },
-           quic_conn,
-       ))
+            },
+            quic_conn,
+        ))
     }
 
-    fn on_new_connection<'a>(
-        &mut self, peer: &SocketAddr, header: &quiche::Header<'a>, packet: &mut [u8]
+    fn on_new_connection(
+        &mut self, peer: &SocketAddr, header: &quiche::Header<'_>, packet: &mut [u8],
     ) -> io::Result<(Option<QuicSocket>, Arc<std::sync::Mutex<QuicConnection>>)> {
         let odcid = validate_token(&self.token_prefix, peer, header.token.as_ref().unwrap())
             .ok_or_else(||
@@ -466,6 +468,7 @@ impl QuicMultiplexer {
         let quic_conn = Arc::new(std::sync::Mutex::new(quic_conn));
         let conn = HandshakingConnection {
             quic_conn: quic_conn.clone(),
+            local_address: self.core_settings.listen_address,
         };
 
         if is_established {
@@ -478,9 +481,14 @@ impl QuicMultiplexer {
     }
 
     fn proceed_established_connection(
-        &self, conn: &EstablishedConnection, peer: &SocketAddr, packet: &mut [u8]
+        &self, conn: &EstablishedConnection, peer: &SocketAddr, packet: &mut [u8],
     ) -> io::Result<Arc<std::sync::Mutex<QuicConnection>>> {
-        quic_recv(&mut conn.quic_conn.lock().unwrap(), packet, &quiche::RecvInfo{ from: *peer }, &self.id)?;
+        quic_recv(
+            &mut conn.quic_conn.lock().unwrap(),
+            packet,
+            &quiche::RecvInfo { from: *peer, to: self.core_settings.listen_address },
+            &self.id,
+        )?;
         match conn.socket_tx.try_send(MultiplexerMessage::PollH3) {
             // `Full` is not considered as an error in this case, as the connection does not need
             // multiple `poll` messages in the queue
@@ -532,7 +540,7 @@ impl QuicMultiplexer {
                 Ok(m) => self.on_socket_message(m)?,
                 Err(mpsc::error::TryRecvError::Empty) => return Ok(()),
                 Err(mpsc::error::TryRecvError::Disconnected) => return Err(io::Error::new(
-                    ErrorKind::Other, "Message receive channel closed unexpectedly"
+                    ErrorKind::Other, "Message receive channel closed unexpectedly",
                 )),
             }
         }
@@ -576,14 +584,14 @@ impl QuicSocket {
     pub fn send_response(&self, stream_id: u64, response: ResponseHeaders, fin: bool) -> io::Result<()> {
         let response: Vec<_> =
             std::iter::once(h3::HeaderRef::new(
-                ":status".as_bytes(), response.status.as_str().as_bytes()
+                ":status".as_bytes(), response.status.as_str().as_bytes(),
             ))
                 .chain(response.headers.iter()
                     .map(|(n, v)| h3::HeaderRef::new(n.as_ref(), v.as_ref())))
                 .collect();
 
         self.h3_conn.lock().unwrap().send_response(
-            &mut self.quic_conn.lock().unwrap(), stream_id, response.as_slice(), fin
+            &mut self.quic_conn.lock().unwrap(), stream_id, response.as_slice(), fin,
         ).map_err(|e| io::Error::new(ErrorKind::Other, e.to_string()))?;
 
         self.flush_pending_data()
@@ -623,7 +631,7 @@ impl QuicSocket {
 
     pub fn write(&self, stream_id: u64, mut data: Bytes) -> io::Result<Bytes> {
         match self.h3_conn.lock().unwrap().send_body(
-            &mut self.quic_conn.lock().unwrap(), stream_id, data.as_ref(), false
+            &mut self.quic_conn.lock().unwrap(), stream_id, data.as_ref(), false,
         ) {
             Ok(n) => data.advance(n),
             Err(h3::Error::Done) => (),
@@ -698,7 +706,7 @@ impl QuicSocket {
             let quic_conn = self.quic_conn.lock().unwrap();
             if quic_conn.is_closed() {
                 let _ = self.mux_tx.lock().unwrap()
-                    .send(SocketMessage::Close(quic_conn.source_id().into_owned()));
+                    .try_send(SocketMessage::Close(quic_conn.source_id().into_owned()));
                 return Err(io::Error::from(ErrorKind::UnexpectedEof));
             }
 
@@ -744,11 +752,11 @@ impl QuicSocket {
                 Ok(Some(QuicSocketEvent::Close(stream_id)))
             }
             Ok((_, h3::Event::Datagram)) => Err(io::Error::new(
-                ErrorKind::Other, "Received unexpected datagram frame"
+                ErrorKind::Other, "Received unexpected datagram frame",
             )),
             Ok((_, h3::Event::PriorityUpdate)) => Ok(None),
             Ok((_, h3::Event::GoAway)) => Err(io::Error::new(
-                ErrorKind::UnexpectedEof, "Received GOAWAY"
+                ErrorKind::UnexpectedEof, "Received GOAWAY",
             )),
             Err(h3::Error::Done) => Ok(None),
             Err(e) => Err(io::Error::new(ErrorKind::Other, e.to_string())),
@@ -770,7 +778,7 @@ impl QuicSocket {
                     Ok(name) => request_builder.header(name, h.value()),
                     Err(InvalidHeaderName { .. }) => return Err(io::Error::new(
                         ErrorKind::InvalidData,
-                        format!("Unexpected header name: 0x{}", utils::hex_dump(h.name()))
+                        format!("Unexpected header name: 0x{}", utils::hex_dump(h.name())),
                     )),
                 }
             }
@@ -781,7 +789,7 @@ impl QuicSocket {
                 .build()
                 .map_err(|e| io::Error::new(
                     ErrorKind::InvalidData,
-                    format!("Invalid URI: {}", e)
+                    format!("Invalid URI: {}", e),
                 ))?
             )
             .body(())
@@ -791,18 +799,18 @@ impl QuicSocket {
 }
 
 impl HandshakingConnection {
-    fn proceed_handshake<'a>(
+    fn proceed_handshake(
         &self,
         peer: &SocketAddr,
         packet: &mut [u8],
         log_id: &log_utils::IdChain<u64>,
     ) -> io::Result<HandshakeStatus> {
         let mut quic_conn = self.quic_conn.lock().unwrap();
-        quic_recv(&mut quic_conn, packet, &quiche::RecvInfo { from: *peer }, log_id)?;
+        quic_recv(&mut quic_conn, packet, &quiche::RecvInfo { from: *peer, to: self.local_address }, log_id)?;
 
         if quic_conn.is_closed() {
             return Err(io::Error::new(
-                ErrorKind::Other, format!("[{}] Connection closed", quic_conn.trace_id())
+                ErrorKind::Other, format!("[{}] Connection closed", quic_conn.trace_id()),
             ));
         }
 
@@ -858,7 +866,7 @@ fn quic_recv(
             Ok(())
         }
         Err(e) => Err(io::Error::new(
-            ErrorKind::Other, format!("QUIC receive failure: {}", e)
+            ErrorKind::Other, format!("QUIC receive failure: {}", e),
         )),
     }
 }
@@ -878,11 +886,11 @@ fn make_quic_conn_config(
     cfg.set_max_recv_udp_payload_size(quic_settings.recv_udp_payload_size);
     cfg.set_max_send_udp_payload_size(quic_settings.send_udp_payload_size);
     cfg.set_initial_max_data(quic_settings.initial_max_data);
-    cfg.set_initial_max_stream_data_bidi_local(quic_settings.max_stream_data_bidi_local);
-    cfg.set_initial_max_stream_data_bidi_remote(quic_settings.max_stream_data_bidi_remote);
-    cfg.set_initial_max_stream_data_uni(quic_settings.max_stream_data_uni);
-    cfg.set_initial_max_streams_bidi(quic_settings.max_streams_bidi);
-    cfg.set_initial_max_streams_uni(quic_settings.max_streams_uni);
+    cfg.set_initial_max_stream_data_bidi_local(quic_settings.initial_max_stream_data_bidi_local);
+    cfg.set_initial_max_stream_data_bidi_remote(quic_settings.initial_max_stream_data_bidi_remote);
+    cfg.set_initial_max_stream_data_uni(quic_settings.initial_max_stream_data_uni);
+    cfg.set_initial_max_streams_bidi(quic_settings.initial_max_streams_bidi);
+    cfg.set_initial_max_streams_uni(quic_settings.initial_max_streams_uni);
     cfg.set_max_connection_window(quic_settings.max_connection_window);
     cfg.set_max_stream_window(quic_settings.max_stream_window);
     cfg.set_disable_active_migration(quic_settings.disable_active_migration);
@@ -911,7 +919,7 @@ fn mint_token(header: &quiche::Header, prefix: &[u8; TOKEN_PREFIX_SIZE], peer: &
 }
 
 fn validate_token<'a>(prefix: &[u8; TOKEN_PREFIX_SIZE], peer: &SocketAddr, token: &'a [u8])
-    -> Option<quiche::ConnectionId<'a>>
+                      -> Option<quiche::ConnectionId<'a>>
 {
     token.strip_prefix(prefix)
         .and_then(|token| token.strip_prefix(socket_addr_to_vec(peer).as_slice()))

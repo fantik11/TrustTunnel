@@ -207,7 +207,7 @@ impl IcmpForwarder {
     async fn listen_v4(&self) -> io::Result<(IpAddr, icmp_utils::Message)> {
         loop {
             let (peer, packet) = Self::listen_socket(
-                &self.shared.sockets.read().await
+                self.shared.sockets.read().await
                     .v4.as_ref().unwrap()
             ).await?;
 

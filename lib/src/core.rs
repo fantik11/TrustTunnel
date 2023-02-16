@@ -461,10 +461,10 @@ impl Core {
     {
         match protocol {
             Protocol::Http1 => Ok(Box::new(Http1Codec::new(
-                core_settings, io, log_id.clone(),
+                core_settings, io, log_id,
             ))),
             Protocol::Http2 => Ok(Box::new(Http2Codec::new(
-                core_settings, io, log_id.clone(),
+                core_settings, io, log_id,
             )?)),
             Protocol::Http3 => unreachable!(),
         }

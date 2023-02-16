@@ -102,7 +102,7 @@ pub(crate) fn verify_message_authenticator(request: &Packet, reply: &Packet) -> 
             let mut encoded_reply = reply.encode().unwrap();
             encoded_reply.splice(
                 AUTHENTICATOR_OFFSET..AUTHENTICATOR_OFFSET + AUTHENTICATOR_SIZE,
-                request.get_authenticator().into_iter().cloned()
+                request.get_authenticator().iter().cloned()
             );
 
             let mut hash = Hmac::new(Md5::new(), request.get_secret());
@@ -137,10 +137,10 @@ fn set_message_authenticator(packet: &mut Packet) {
 pub(crate) fn wrap_eap_message(
     code: Code, secret: &[u8], user_name: &str, payload: &[u8],
 ) -> Packet {
-    let mut packet = Packet::new(code, &secret.to_vec());
+    let mut packet = Packet::new(code, secret);
 
-    rfc2865::add_user_name(&mut packet, &user_name);
-    rfc2869::add_eap_message(&mut packet, &payload);
+    rfc2865::add_user_name(&mut packet, user_name);
+    rfc2869::add_eap_message(&mut packet, payload);
     set_message_authenticator(&mut packet);
 
     packet
@@ -149,7 +149,7 @@ pub(crate) fn wrap_eap_message(
 pub(crate) async fn exchange(
     client: &Client, server_addr: &SocketAddr, request: &Packet,
 ) -> Result<Packet, ExchangeError> {
-    let reply = client.send_packet(server_addr, &request).await
+    let reply = client.send_packet(server_addr, request).await
         .map_err(|e| ExchangeError::Client(format!("{:?}", e)))?;
     debug!("Received reply: {:?}", reply);
 

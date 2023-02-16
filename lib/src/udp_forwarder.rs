@@ -66,7 +66,7 @@ pub(crate) fn make_multiplexer(
             shared: shared.clone(),
             wake_rx,
             pending_closures: Default::default(),
-            parent_id_chain: id.clone(),
+            parent_id_chain: id,
         }),
         Box::new(MultiplexerSink {
             shared,
@@ -103,7 +103,7 @@ impl MultiplexerSource {
             })),
             Err(e) if e.kind() == ErrorKind::WouldBlock => None,
             Err(e) => {
-                self.on_socket_error(&meta, e);
+                self.on_socket_error(meta, e);
                 None
             }
         }

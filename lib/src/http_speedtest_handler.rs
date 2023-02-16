@@ -86,14 +86,14 @@ pub(crate) async fn listen(mut codec: Box<dyn HttpCodec>, timeout: Duration, log
 }
 
 fn prepare_speedtest(request: &http_codec::RequestHeaders) -> Result<Speedtest, String> {
-    match &request.method {
-        &http::Method::GET => request.uri.path().strip_prefix('/')
+    match request.method {
+        http::Method::GET => request.uri.path().strip_prefix('/')
             .and_then(|x| x.strip_suffix("mb.bin"))
             .and_then(|x| x.parse::<u32>().ok())
-            .and_then(|x| (0 < x && x <= MAX_DOWNLOAD_MB).then(|| x))
+            .and_then(|x| (0 < x && x <= MAX_DOWNLOAD_MB).then_some(x))
             .map(|x| Speedtest::Download(x * 1024 * 1024))
             .ok_or_else(|| "Unexpected path".to_string()),
-        &http::Method::POST => {
+        http::Method::POST => {
             if request.uri.path() != "/upload.html" {
                 return Err("Unexpected path".to_string());
             }
@@ -101,7 +101,7 @@ fn prepare_speedtest(request: &http_codec::RequestHeaders) -> Result<Speedtest, 
             request.headers.get(http::header::CONTENT_LENGTH)
                 .and_then(|x| x.to_str().ok())
                 .and_then(|x| x.parse::<u32>().ok())
-                .and_then(|x| (0 < x && x <= MAX_UPLOAD_MB * 1024 * 1024).then(|| x))
+                .and_then(|x| (0 < x && x <= MAX_UPLOAD_MB * 1024 * 1024).then_some(x))
                 .map(Speedtest::Upload)
                 .ok_or_else(|| format!("Unexpected {} header value", http::header::CONTENT_LENGTH))
         }
@@ -185,6 +185,5 @@ async fn run_upload_test(stream: Box<dyn http_codec::Stream>, n: u32) {
 
     if let Err(e) = respond.send_ok_response(true) {
         log_id!(debug, log_id, "Failed to respond request: {}", e);
-        return;
     }
 }

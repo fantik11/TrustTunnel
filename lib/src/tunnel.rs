@@ -38,24 +38,18 @@ pub(crate) enum ConnectionError {
     Other(String),
 }
 
-impl ConnectionError {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Io(x) => format!("IO error: {}", x),
-            Self::Authentication(x) => format!("Authentication error: {}", x),
-            Self::Timeout => "Connection timed out".to_string(),
-            Self::HostUnreachable => "Remote host is unreachable".to_string(),
-            Self::DnsNonroutable => "DNS: resolved address in non-routable network".to_string(),
-            Self::DnsLoopback => "DNS: resolved address in loopback".to_string(),
-            Self::DnsBlocked => "DNS: blocked by Adguard DNS".to_string(),
-            Self::Other(x) => format!("{}", x),
-        }
-    }
-}
-
 impl Display for ConnectionError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        match self {
+            Self::Io(x) => write!(f, "IO error: {}", x),
+            Self::Authentication(x) => write!(f, "Authentication error: {}", x),
+            Self::Timeout => write!(f, "Connection timed out"),
+            Self::HostUnreachable => write!(f, "Remote host is unreachable"),
+            Self::DnsNonroutable => write!(f, "DNS: resolved address in non-routable network"),
+            Self::DnsLoopback => write!(f, "DNS: resolved address in loopback"),
+            Self::DnsBlocked => write!(f, "DNS: blocked by Adguard DNS"),
+            Self::Other(x) => write!(f, "{}", x),
+        }
     }
 }
 
@@ -171,7 +165,7 @@ impl Tunnel {
                         ).await {
                             log_id!(debug, request_id, "{}: {}", message, e);
                             if let Some(request) = request {
-                                let _ = request.fail_request(e);
+                                request.fail_request(e);
                             }
                         }
                     }
@@ -181,7 +175,7 @@ impl Tunnel {
                         ).await {
                             log_id!(debug, request_id, "{}: {}", message, e);
                             if let Some(request) = request {
-                                let _ = request.fail_request(e);
+                                request.fail_request(e);
                             }
                         }
                     }
@@ -225,7 +219,7 @@ impl Tunnel {
                 context.settings.tcp_connections_timeout,
                 connector.connect(request_id.clone(), meta),
             ).await
-                .unwrap_or_else(|_| Err(ConnectionError::Timeout))
+                .unwrap_or(Err(ConnectionError::Timeout))
             {
                 Ok(x) => x,
                 Err(e) => return Err((Some(request), "Connection to peer failed", e)),

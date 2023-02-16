@@ -73,7 +73,7 @@ impl<T: Copy + serde::ser::Serialize> Display for IdChain<T> {
         let str = self.list.iter()
             .fold(String::new(), |acc, i| {
                 let x = dynfmt::curly::SimpleCurlyFormat
-                    .format(i.fmt, &[i.id])
+                    .format(i.fmt, [i.id])
                     .unwrap();
 
                 if !acc.is_empty() {

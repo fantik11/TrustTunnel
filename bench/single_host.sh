@@ -45,11 +45,8 @@ build_remote() {
 build_middle_ag_rust() {
   local endpoint_url="$1"
 
-  if [ ! -d "$SELF_DIR_PATH/$ENDPOINT_DIR" ]; then
-    git clone "$endpoint_url" "$SELF_DIR_PATH/$ENDPOINT_DIR"
-    cd "$SELF_DIR_PATH/$ENDPOINT_DIR"
-    # todo: stay on master
-    git checkout feature/bench
+  if [ ! -d "$SELF_DIR_PATH/middle-box/adguard-rust/$ENDPOINT_DIR" ]; then
+    git clone "$endpoint_url" "$SELF_DIR_PATH/middle-box/adguard-rust/$ENDPOINT_DIR"
   fi
 
   docker build \

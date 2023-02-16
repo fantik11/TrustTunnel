@@ -54,11 +54,11 @@ impl Metrics {
     }
 
     pub fn add_inbound_bytes(&self, protocol: Protocol, n: usize) {
-        self.inbound_traffic.with_label_values(&[protocol.to_str()]).inc_by(n as u64);
+        self.inbound_traffic.with_label_values(&[protocol.as_str()]).inc_by(n as u64);
     }
 
     pub fn add_outbound_bytes(&self, protocol: Protocol, n: usize) {
-        self.outbound_traffic.with_label_values(&[protocol.to_str()]).inc_by(n as u64);
+        self.outbound_traffic.with_label_values(&[protocol.as_str()]).inc_by(n as u64);
     }
 
     fn collect(&self) -> (String, Bytes) {
@@ -74,7 +74,7 @@ impl Metrics {
 
 impl ClientSessionsCounter {
     fn new(metrics: Arc<Metrics>, protocol: Protocol) -> Self {
-        metrics.client_sessions.with_label_values(&[protocol.to_str()]).inc();
+        metrics.client_sessions.with_label_values(&[protocol.as_str()]).inc();
 
         Self {
             metrics,
@@ -85,7 +85,7 @@ impl ClientSessionsCounter {
 
 impl Drop for ClientSessionsCounter {
     fn drop(&mut self) {
-        self.metrics.client_sessions.with_label_values(&[self.protocol.to_str()]).dec();
+        self.metrics.client_sessions.with_label_values(&[self.protocol.as_str()]).dec();
     }
 }
 

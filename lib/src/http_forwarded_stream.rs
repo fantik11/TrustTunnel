@@ -255,10 +255,8 @@ impl pipe::Sink for ForwardedStreamSink {
     fn eof(&mut self) -> io::Result<()> {
         match std::mem::replace(&mut self.state, SinkState::Idle) {
             SinkState::Idle => Ok(()),
-            SinkState::WaitingResponse(x) => {
-                let _ = x.respond.send_bad_response(http::StatusCode::BAD_GATEWAY, vec![])?;
-                Ok(())
-            }
+            SinkState::WaitingResponse(x) =>
+                x.respond.send_bad_response(http::StatusCode::BAD_GATEWAY, vec![]),
             SinkState::TransferringBodyNonEncoded(mut x) => x.sink.eof(),
             SinkState::WaitingChunkPrefix(mut x) => x.sink.eof(),
             SinkState::TransferringBodyChunked(mut x) => x.sink.eof(),
@@ -663,7 +661,7 @@ fn serialize_request(request: &RequestHeaders) -> io::Result<(Bytes, BodyLength)
     body_length = if request.method == http::Method::HEAD {
         Some(BodyLength::Determined(0))
     } else {
-        body_length.or_else(|| match request.version {
+        body_length.or(match request.version {
             http::Version::HTTP_2 | http::Version::HTTP_3 => Some(BodyLength::Chunked),
             _ => None,
         })

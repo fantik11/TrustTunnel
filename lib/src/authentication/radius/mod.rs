@@ -11,6 +11,7 @@ use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use base64::Engine;
 use bytes::Bytes;
 use cached::{Cached, TimedSizedCache};
 use radius::client::Client;
@@ -188,7 +189,7 @@ impl Session {
         client: &Client, server_address: &SocketAddr, request: &Packet, log_id: &log_utils::IdChain<u64>,
     ) -> Result<Packet, AuthenticationError> {
         log_id!(trace, log_id, "Sending radius request: {:?}", request);
-        let reply = radius_utils::exchange(&client, server_address, &request).await
+        let reply = radius_utils::exchange(client, server_address, request).await
             .map_err(AuthenticationError::RadiusExchange)?;
         log_id!(trace, log_id, "Radius reply: {:?}", reply);
         Ok(reply)
@@ -203,7 +204,7 @@ impl Session {
     async fn exchange_challenge_phase(
         client: &Client, server_address: &SocketAddr, request: &Packet, log_id: &log_utils::IdChain<u64>,
     ) -> Result<eap::Message, AuthenticationError> {
-        let reply = Self::exchange_radius(&client, server_address, &request, log_id).await?;
+        let reply = Self::exchange_radius(client, server_address, request, log_id).await?;
         if reply.get_code() != Code::AccessChallenge {
             return Err(AuthenticationError::Other(
                 format!("Unexpected RADIUS reply code: request={:?}, reply={:?}", request, reply)
@@ -240,7 +241,7 @@ impl Session {
                 x,
             ),
             authentication::Source::ProxyBasic(x) => {
-                let credentials = base64::decode(x.as_ref())
+                let credentials = base64::engine::general_purpose::STANDARD.decode(x.as_ref())
                     .map_err(|e| e.to_string())
                     .and_then(|x| String::from_utf8(x).map_err(|e| e.to_string()))
                     .map_err(AuthenticationError::Other)?;

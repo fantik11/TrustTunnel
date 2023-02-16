@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, ErrorKind};
 use async_trait::async_trait;
+use base64::Engine;
 use crypto::digest::Digest;
 use crate::{authentication, log_utils};
 use crate::authentication::Authenticator;
@@ -73,7 +74,7 @@ impl FileBasedAuthenticator {
                 hash.input(creds.as_bytes());
                 hash.result_str()
             },
-            proxy_auth: base64::encode(format!("{}:{}", token, creds)),
+            proxy_auth: base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", token, creds)),
         })
     }
 }

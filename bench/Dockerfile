@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM python:3.11-slim-bullseye
 
-ARG RUST_CHANNEL=1.62
+ARG RUST_CHANNEL=1.67
 
 # Install the required utilities
 RUN apt update && \

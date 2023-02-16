@@ -50,7 +50,7 @@ impl Channel {
 }
 
 impl Protocol {
-    pub fn to_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             Self::Http1 => "HTTP1",
             Self::Http2 => "HTTP2",

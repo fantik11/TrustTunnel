@@ -16,7 +16,12 @@ vpn_libs_endpoint = { version = "0.1", path = "lib" }
 chrono = "0.4"
 log = "0.4"
 serde_json = "1.0"
-clap = "3.1"
-tokio = { version = "1.20.1", features = ["rt-multi-thread", "signal"] }
-sentry = { version = "0.25.0", default-features = false, features = ["backtrace", "panic", "reqwest", "rustls", "contexts"] }
-once_cell = "1.12.0"
+clap = "=4.1.4"
+tokio = { version = "=1.25.0", features = ["rt-multi-thread", "signal"] }
+sentry = { version = "=0.29.3", default-features = false, features = ["backtrace", "panic", "reqwest", "rustls", "contexts"] }
+once_cell = "=1.17.0"
+console-subscriber = { version = "=0.1.8", optional = true }
+
+[features]
+# RUSTFLAGS="--cfg tokio_unstable" must also be set
+tracing = ["vpn_libs_endpoint/tracing", "tokio/tracing", "dep:console-subscriber"]

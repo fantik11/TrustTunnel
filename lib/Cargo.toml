@@ -14,14 +14,14 @@ cc = "1.0"
 
 [dependencies]
 log = "0.4"
-quiche = { version = "0.14.0", features = ["qlog"] }
+quiche = { version = "=0.16.0", features = ["qlog"] }
 ring = "0.16"
 lazy_static = "1.4"
 httparse = "1.7.1"
 rustls = { version = "=0.20.7", features = ["logging"] }
-base64 = "0.13"
+base64 = "=0.21.0"
 libc = "0.2"
-tokio = { version = "1.20.1", features = ["net", "rt", "sync", "time", "macros", "rt-multi-thread"] }
+tokio = { version = "=1.25.0", features = ["net", "rt", "sync", "time", "macros", "rt-multi-thread"] }
 h2 = "0.3"
 http = "0.2"
 tokio-rustls = "0.23"
@@ -32,9 +32,12 @@ futures = "0.3"
 num_cpus = "1.13"
 dynfmt = { version = "0.1", features = ["curly"], default-features = false }
 serde = "1.0"
-radius = "0.2.1"
+radius = "=0.3.1"
 rust-crypto = "0.2.36"
 md4 = "0.10.1"
 des = "0.8.1"
-cached = "0.34.0"
+cached = "=0.42.0"
 prometheus = { version = "0.13.0", features = ["process"] }
+
+[features]
+tracing = ["tokio/tracing"]

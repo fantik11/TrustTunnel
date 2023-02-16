@@ -362,7 +362,7 @@ fn des_parity_key(key_in: &[u8; 7]) -> [u8; 8] {
     let mut out = [0; 8];
 
     for (i, x) in key_in.iter().cloned().enumerate() {
-        out[i] = ((x >> i) | c_next | 1) as u8;
+        out[i] = (x >> i) | c_next | 1;
         c_next = x << (7 - i);
     }
 

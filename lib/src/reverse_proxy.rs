@@ -129,7 +129,7 @@ async fn establish_tunnel(
     }
     request_headers.headers.insert(
         ORIGINAL_PROTOCOL_HEADER,
-        http::HeaderValue::from_static(codec.protocol().to_str())
+        http::HeaderValue::from_static(codec.protocol().as_str())
     );
 
     let encoded = http1_codec::encode_request(&request_headers);

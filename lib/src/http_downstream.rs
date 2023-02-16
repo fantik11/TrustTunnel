@@ -215,7 +215,7 @@ impl downstream::PendingRequest for DatagramMultiplexer {
                 }),
                 Box::new(DatagramEncoder {
                     sink: sink.send_ok_response(false)?.into_datagram_sink(),
-                    encoder: Box::new(http_udp_codec::Encoder::default()),
+                    encoder: Box::<http_udp_codec::Encoder>::default(),
                 }),
             )),
             ICMP_AUTHORITY => {
@@ -227,7 +227,7 @@ impl downstream::PendingRequest for DatagramMultiplexer {
                     }),
                     Box::new(DatagramEncoder {
                         sink: sink.send_ok_response(false)?.into_datagram_sink(),
-                        encoder: Box::new(http_icmp_codec::Encoder::default()),
+                        encoder: Box::<http_icmp_codec::Encoder>::default(),
                     }),
                 ))
             },
@@ -252,7 +252,7 @@ impl downstream::PendingDatagramMultiplexerRequest for DatagramMultiplexer {
 
 impl<D> downstream::StreamId for DatagramDecoder<D> {
     fn id(&self) -> log_utils::IdChain<u64> {
-        self.source.id().clone()
+        self.source.id()
     }
 }
 
@@ -261,7 +261,7 @@ impl<D> datagram_pipe::Source for DatagramDecoder<D> {
     type Output = D;
 
     fn id(&self) -> log_utils::IdChain<u64> {
-        self.source.id().clone()
+        self.source.id()
     }
 
     async fn read(&mut self) -> io::Result<D> {

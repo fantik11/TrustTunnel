@@ -7,6 +7,7 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use base64::Engine;
 use bytes::BytesMut;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
@@ -237,7 +238,7 @@ impl forwarder::TcpConnector for TcpConnector {
                     }
                 )
                 .transpose()
-                .map_err(|x| tunnel::ConnectionError::Other(x))?,
+                .map_err(tunnel::ConnectionError::Other)?,
             socks5_client::Request::Connect(destination, port),
         ).await {
             Ok(socks5_client::ConnectResult::TcpConnection(stream)) =>
@@ -451,7 +452,7 @@ fn make_auth(auth: authentication::Source) -> Result<socks5_client::Authenticati
             )
         },
         authentication::Source::ProxyBasic(x) => {
-            let credentials = base64::decode(x.as_ref())
+            let credentials = base64::engine::general_purpose::STANDARD.decode(x.as_ref())
                 .map_err(|e| e.to_string())
                 .and_then(|x| String::from_utf8(x).map_err(|e| e.to_string()))?;
             let mut split = credentials.splitn(2, ':');

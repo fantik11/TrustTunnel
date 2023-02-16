@@ -301,22 +301,22 @@ pub struct QuicSettings {
     #[serde(default = "QuicSettings::default_initial_max_data")]
     pub(crate) initial_max_data: u64,
     /// The initial flow control limit for locally initiated bidirectional streams
-    #[serde(default = "QuicSettings::default_max_stream_data_bidi_local")]
-    pub(crate) max_stream_data_bidi_local: u64,
+    #[serde(default = "QuicSettings::default_initial_max_stream_data_bidi_local")]
+    pub(crate) initial_max_stream_data_bidi_local: u64,
     /// The initial flow control limit for peer-initiated bidirectional streams
-    #[serde(default = "QuicSettings::default_max_stream_data_bidi_remote")]
-    pub(crate) max_stream_data_bidi_remote: u64,
+    #[serde(default = "QuicSettings::default_initial_max_stream_data_bidi_remote")]
+    pub(crate) initial_max_stream_data_bidi_remote: u64,
     /// The initial flow control limit for unidirectional streams
-    #[serde(default = "QuicSettings::default_max_stream_data_uni")]
-    pub(crate) max_stream_data_uni: u64,
+    #[serde(default = "QuicSettings::default_initial_max_stream_data_uni")]
+    pub(crate) initial_max_stream_data_uni: u64,
     /// The initial maximum number of bidirectional streams the endpoint that receives this
     /// transport parameter is permitted to initiate
-    #[serde(default = "QuicSettings::default_max_streams_bidi")]
-    pub(crate) max_streams_bidi: u64,
+    #[serde(default = "QuicSettings::default_initial_max_streams_bidi")]
+    pub(crate) initial_max_streams_bidi: u64,
     /// The initial maximum number of unidirectional streams the endpoint that receives this
     /// transport parameter is permitted to initiate
-    #[serde(default = "QuicSettings::default_max_streams_uni")]
-    pub(crate) max_streams_uni: u64,
+    #[serde(default = "QuicSettings::default_initial_max_streams_uni")]
+    pub(crate) initial_max_streams_uni: u64,
     /// The maximum size of the connection window
     #[serde(default = "QuicSettings::default_max_connection_window")]
     pub(crate) max_connection_window: u64,
@@ -531,7 +531,7 @@ impl Http1Settings {
     }
 
     fn default_upload_buffer_size() -> usize {
-        return 32 * 1024;
+        32 * 1024
     }
 }
 
@@ -578,23 +578,23 @@ impl QuicSettings {
         100 * 1024 * 1024
     }
 
-    fn default_max_stream_data_bidi_local() -> u64 {
+    fn default_initial_max_stream_data_bidi_local() -> u64 {
         1024 * 1024
     }
 
-    fn default_max_stream_data_bidi_remote() -> u64 {
+    fn default_initial_max_stream_data_bidi_remote() -> u64 {
         1024 * 1024
     }
 
-    fn default_max_stream_data_uni() -> u64 {
+    fn default_initial_max_stream_data_uni() -> u64 {
         1024 * 1024
     }
 
-    fn default_max_streams_bidi() -> u64 {
+    fn default_initial_max_streams_bidi() -> u64 {
         4 * 1024
     }
 
-    fn default_max_streams_uni() -> u64 {
+    fn default_initial_max_streams_uni() -> u64 {
         4 * 1024
     }
 
@@ -924,11 +924,11 @@ impl QuicSettingsBuilder {
                 recv_udp_payload_size: QuicSettings::default_recv_udp_payload_size(),
                 send_udp_payload_size: QuicSettings::default_send_udp_payload_size(),
                 initial_max_data: QuicSettings::default_initial_max_data(),
-                max_stream_data_bidi_local: QuicSettings::default_max_stream_data_bidi_local(),
-                max_stream_data_bidi_remote: QuicSettings::default_max_stream_data_bidi_remote(),
-                max_stream_data_uni: QuicSettings::default_max_stream_data_uni(),
-                max_streams_bidi: QuicSettings::default_max_streams_bidi(),
-                max_streams_uni: QuicSettings::default_max_streams_uni(),
+                initial_max_stream_data_bidi_local: QuicSettings::default_initial_max_stream_data_bidi_local(),
+                initial_max_stream_data_bidi_remote: QuicSettings::default_initial_max_stream_data_bidi_remote(),
+                initial_max_stream_data_uni: QuicSettings::default_initial_max_stream_data_uni(),
+                initial_max_streams_bidi: QuicSettings::default_initial_max_streams_bidi(),
+                initial_max_streams_uni: QuicSettings::default_initial_max_streams_uni(),
                 max_connection_window: QuicSettings::default_max_connection_window(),
                 max_stream_window: QuicSettings::default_max_stream_window(),
                 disable_active_migration: QuicSettings::default_disable_active_migration(),
@@ -963,31 +963,31 @@ impl QuicSettingsBuilder {
 
     /// Set the `initial_max_stream_data_bidi_local` transport parameter
     pub fn max_stream_data_bidi_local(mut self, v: u64) -> Self {
-        self.settings.max_stream_data_bidi_local = v;
+        self.settings.initial_max_stream_data_bidi_local = v;
         self
     }
 
     /// Set the `initial_max_stream_data_bidi_remote` transport parameter
     pub fn max_stream_data_bidi_remote(mut self, v: u64) -> Self {
-        self.settings.max_stream_data_bidi_remote = v;
+        self.settings.initial_max_stream_data_bidi_remote = v;
         self
     }
 
     /// Set the `initial_max_stream_data_uni` transport parameter
     pub fn max_stream_data_uni(mut self, v: u64) -> Self {
-        self.settings.max_stream_data_uni = v;
+        self.settings.initial_max_stream_data_uni = v;
         self
     }
 
     /// Set the `initial_max_streams_bidi` transport parameter
     pub fn max_streams_bidi(mut self, v: u64) -> Self {
-        self.settings.max_streams_bidi = v;
+        self.settings.initial_max_streams_bidi = v;
         self
     }
 
     /// Set the `initial_max_streams_uni` transport parameter
     pub fn max_streams_uni(mut self, v: u64) -> Self {
-        self.settings.max_streams_uni = v;
+        self.settings.initial_max_streams_uni = v;
         self
     }
 

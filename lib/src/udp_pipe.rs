@@ -93,7 +93,7 @@ impl<F: Fn(pipe::SimplexDirection, usize) + Send + Sync> LeftPipe<F> {
             forwarder::UdpDatagramMeta::from(meta),
             UdpConnection {
                 last_activity: Instant::now(),
-                plain_dns_info: is_plain_dns.then(|| PlainDnsInfo {
+                plain_dns_info: is_plain_dns.then_some(PlainDnsInfo {
                     pending_queries: 0,
                 }),
                 log_id: self.source.id().extended(log_utils::IdItem::new(
@@ -104,9 +104,11 @@ impl<F: Fn(pipe::SimplexDirection, usize) + Send + Sync> LeftPipe<F> {
 
         self.shared.forwarder_shared.on_new_udp_connection(meta).await?;
 
-        self.shared.udp_connections.lock().unwrap()
+        if let Some(c) = self.shared.udp_connections.lock().unwrap()
             .get_mut(&forwarder::UdpDatagramMeta::from(meta))
-            .map(|c| c.register_outgoing_packet());
+        {
+            c.register_outgoing_packet()
+        }
         Ok(())
     }
 }
