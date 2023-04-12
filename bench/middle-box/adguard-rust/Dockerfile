@@ -9,6 +9,9 @@ ARG LOG_LEVEL="info"
 
 RUN apt install -y openssl
 
+COPY $ENDPOINT_DIR/lib/Cargo.toml /tmp/Cargo.toml
+RUN cargo fetch --manifest-path /tmp/Cargo.toml && rm /tmp/Cargo.toml
+
 COPY $ENDPOINT_DIR /bench/$ENDPOINT_DIR
 
 WORKDIR /bench/

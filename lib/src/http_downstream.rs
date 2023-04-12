@@ -382,10 +382,6 @@ fn tunnel_error_to_warn_header(error: &tunnel::ConnectionError, hostname: &str) 
             (DNS_WARNING_HEADER_NAME.to_string(), hostname.to_string()),
             (WARNING_HEADER_NAME.to_string(), format!("311 - {}", error)),
         ],
-        tunnel::ConnectionError::DnsBlocked => vec![
-            (DNS_WARNING_HEADER_NAME.to_string(), hostname.to_string()),
-            (WARNING_HEADER_NAME.to_string(), format!("312 - {}", error)),
-        ],
         tunnel::ConnectionError::Other(_) =>
             vec![(WARNING_HEADER_NAME.to_string(), "300 - Connection failed for some reason".to_string())],
     }

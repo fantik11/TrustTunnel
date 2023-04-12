@@ -6,14 +6,14 @@ import sys
 import yaml
 
 work_dir = os.getcwd()
-vpn_libs_dir_name = sys.argv[1]
+vpn_libs_conanfile = sys.argv[1]
 nlc_url = sys.argv[2]
 nlc_dir_name = "native-libs-common"
 dns_libs_url = sys.argv[3]
 dns_libs_dir_name = "dns-libs"
 nlc_versions = []
 
-with open(os.path.join(work_dir, vpn_libs_dir_name, "conandata.yml"), "r") as file:
+with open(os.path.join(work_dir, vpn_libs_conanfile), "r") as file:
     for r in yaml.safe_load(file)["requirements"]:
         if r.startswith("native_libs_common"):
             nlc_versions.append(r.split('@')[0].split('/')[1])

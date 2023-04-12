@@ -14,7 +14,7 @@ cc = "1.0"
 
 [dependencies]
 log = "0.4"
-quiche = { version = "=0.16.0", features = ["qlog"] }
+quiche = { version = "=0.17.1", features = ["qlog"] }
 ring = "0.16"
 lazy_static = "1.4"
 httparse = "1.7.1"

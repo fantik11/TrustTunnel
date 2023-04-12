@@ -17,21 +17,31 @@ RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && \
     chmod +x llvm.sh && \
     ./llvm.sh $LLVM_MAJOR_VER && \
     rm ./llvm.sh && \
-    apt install -y libc++-$LLVM_MAJOR_VER-dev && \
+    apt install -y libc++-${LLVM_MAJOR_VER}-dev && \
     ln -s libc++abi.so.1 /usr/lib/llvm-$LLVM_MAJOR_VER/lib/libc++abi.so && \
     ## Install Go
     curl https://dl.google.com/go/go${GOLANG_VER}.linux-${arch}.tar.gz -o /tmp/go.tar.gz && \
     rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz
 ENV PATH="/usr/lib/llvm-$LLVM_MAJOR_VER/bin:/usr/local/go/bin:$PATH"
 
-COPY $VPN_LIBS_DIR /bench/$VPN_LIBS_DIR
-COPY bootstrap_conan_deps.py /bench/
-
+COPY bootstrap_conan_deps.py \
+    $VPN_LIBS_DIR/conanfile.py \
+    $VPN_LIBS_DIR/conandata.yml \
+    $VPN_LIBS_DIR/conan/profiles/linux-clang \
+    /tmp/bench-bootstrap/
+WORKDIR /tmp/bench-bootstrap/
 RUN pipreqs . && \
     pip install -r requirements.txt && \
-    rm requirements.txt && \
-    ./bootstrap_conan_deps.py $VPN_LIBS_DIR $NLC_URL $DNS_LIBS_URL
+    ./bootstrap_conan_deps.py conandata.yml $NLC_URL $DNS_LIBS_URL && \
+    conan install . \
+        -pr=linux-clang \
+        -s compiler.version=${LLVM_MAJOR_VER} \
+        -s compiler.libcxx=libc++ \
+        -g=cmake \
+        --build=missing && \
+    rm -rf /tmp/bench-bootstrap
 
+COPY $VPN_LIBS_DIR /bench/$VPN_LIBS_DIR
 WORKDIR /bench/$VPN_LIBS_DIR/build
 RUN cmake .. -DCMAKE_BUILD_TYPE=Release -G "Ninja" \
         -DCMAKE_C_COMPILER="clang" \

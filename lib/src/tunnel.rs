@@ -35,7 +35,6 @@ pub(crate) enum ConnectionError {
     HostUnreachable,
     DnsNonroutable,
     DnsLoopback,
-    DnsBlocked,
     Other(String),
 }
 
@@ -48,7 +47,6 @@ impl Display for ConnectionError {
             Self::HostUnreachable => write!(f, "Remote host is unreachable"),
             Self::DnsNonroutable => write!(f, "DNS: resolved address in non-routable network"),
             Self::DnsLoopback => write!(f, "DNS: resolved address in loopback"),
-            Self::DnsBlocked => write!(f, "DNS: blocked by Adguard DNS"),
             Self::Other(x) => write!(f, "{}", x),
         }
     }
