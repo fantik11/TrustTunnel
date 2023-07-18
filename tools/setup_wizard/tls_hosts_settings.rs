@@ -15,12 +15,14 @@ const DEFAULT_CERTIFICATE_FOLDER: &str = "certs";
 const DEFAULT_HOSTNAME: &str = "vpn.endpoint";
 
 pub fn build() -> TlsHostsSettings {
-    let cert = lookup_existent_cert()
-        .and_then(|x| (crate::get_mode() != Mode::NonInteractive
-            && ask_for_agreement(&format!("Use an existent certificate? {:?}", x)))
-            .then_some(x))
-        .or_else(|| (crate::get_mode() == Mode::NonInteractive
-            || ask_for_agreement("Generate a self-signed certificate?"))
+    let cert = (crate::get_predefined_params().hostname.is_some()
+        || crate::get_mode() == Mode::NonInteractive)
+        .then(generate_cert).flatten()
+        .or_else(|| lookup_existent_cert()
+            .and_then(|x| (crate::get_mode() != Mode::NonInteractive
+                && ask_for_agreement(&format!("Use an existent certificate? {:?}", x)))
+                .then_some(x)))
+        .or_else(|| ask_for_agreement("Generate a self-signed certificate?")
             .then(generate_cert).flatten())
         .or_else(|| {
             let pair = ask_for_input::<String>(
@@ -42,10 +44,10 @@ pub fn build() -> TlsHostsSettings {
         });
 
     let hostname = cert.as_ref().map(|x| x.common_name.clone())
+        .or_else(|| crate::get_predefined_params().hostname.clone())
         .unwrap_or_else(|| ask_for_input::<String>(
             "Endpoint hostname (used for serving TLS connections)",
-            Some(crate::get_predefined_params().hostname.clone()
-                .unwrap_or_else(|| DEFAULT_HOSTNAME.into())),
+            Some(DEFAULT_HOSTNAME.into()),
         ));
 
     TlsHostsSettings::builder()
@@ -134,11 +136,11 @@ fn parse_cert(cert: Either<&str, (&str, &str)>) -> Option<Cert> {
 fn generate_cert() -> Option<Cert> {
     let (common_name, alt_names) = {
         println!("Let's generate a self-signed certificate.");
-        let name = ask_for_input::<String>(
-            "Endpoint hostname (used for serving TLS connections)",
-            Some(crate::get_predefined_params().hostname.clone()
-                .unwrap_or_else(|| DEFAULT_HOSTNAME.into())),
-        );
+        let name = crate::get_predefined_params().hostname.clone()
+            .unwrap_or_else(|| ask_for_input::<String>(
+                "Endpoint hostname (used for serving TLS connections)",
+                Some(DEFAULT_HOSTNAME.into()),
+            ));
         (name.clone(), vec![name.clone(), format!("*.{}", name)])
     };
     let mut params = rcgen::CertificateParams::new(alt_names.clone());

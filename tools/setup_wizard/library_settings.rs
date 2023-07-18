@@ -13,11 +13,13 @@ pub struct Built {
 
 pub fn build() -> Built {
     let builder = Settings::builder()
-        .listen_address(ask_for_input(
-            Settings::doc_listen_address(),
-            Some(crate::get_predefined_params().listen_address.clone()
-                .unwrap_or(Settings::default_listen_address().to_string())),
-        )).unwrap();
+        .listen_address(
+            crate::get_predefined_params().listen_address.clone()
+                .unwrap_or_else(|| ask_for_input(
+                    Settings::doc_listen_address(),
+                    Some(Settings::default_listen_address().to_string()),
+                ))
+        ).unwrap();
 
     Built {
         settings: builder

@@ -128,11 +128,11 @@ Required in non-interactive mode."#),
             let built = library_settings::build();
             println!("The library settings are successfully built\n");
 
-            let path = ask_for_input::<String>(
-                "Path to a file to store the library settings",
-                Some(get_predefined_params().library_settings_file.clone()
-                    .unwrap_or("vpn.toml".into())),
-            );
+            let path = get_predefined_params().library_settings_file.clone()
+                .unwrap_or_else(|| ask_for_input::<String>(
+                    "Path to a file to store the library settings",
+                    Some("vpn.toml".into()),
+                ));
             if checked_overwrite(&path, "Overwrite the existing library settings file?") {
                 let doc = composer::compose_document(&built.settings, &built.credentials_path);
                 fs::write(&path, doc)
@@ -151,11 +151,11 @@ Required in non-interactive mode."#),
             let settings = tls_hosts_settings::build();
             println!("The TLS hosts settings are successfully built\n");
 
-            let path = ask_for_input::<String>(
-                "Path to a file to store the TLS hosts settings",
-                Some(get_predefined_params().tls_hosts_settings_file.clone()
-                    .unwrap_or("hosts.toml".into())),
-            );
+            let path = get_predefined_params().tls_hosts_settings_file.clone()
+                .unwrap_or_else(|| ask_for_input::<String>(
+                    "Path to a file to store the TLS hosts settings",
+                    Some("hosts.toml".into()),
+                ));
             if checked_overwrite(&path, "Overwrite the existing TLS hosts settings file?") {
                 fs::write(
                     &path,

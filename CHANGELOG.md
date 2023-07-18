@@ -1,5 +1,11 @@
 # CHANGELOG
 
+* Added a [docker image](docker/Dockerfile) with a configured and running endpoint.
+* Added a [Makefile](Makefile) to simplify building and running the endpoint.
+* Setup Wizard now doesn't ask for parameters specified through command line arguments.
+  E.g., with `setup_wizard --lib-settings vpn.toml` it won't ask a user for the library
+  settings file path.
+
 ## 0.9.47
 
 * Removed RADIUS-based authenticator
