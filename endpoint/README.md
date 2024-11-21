@@ -40,35 +40,6 @@ A standalone application that allows any user to easily set up their own VPN ser
 
 ## Additional Features
 
-### Testing Network Bandwidth
-
-The endpoint provides a method to test the network bandwidth between the client and
-the endpoint machines.
-
-To conduct a download test, use the following command in the Terminal:
-
-```shell
-curl https://username:password@vpn.endpoint:443/100mb.bin \
-  -k --resolve vpn.endpoint:443:127.0.0.1 -o /dev/null
-```
-
-Replace `vpn.endpoint` with the actual VPN endpoint hostname, and modify `username` and `password`
-according to your settings.
-Adjust `127.0.0.1` and `443` to the IP address and port number of the endpoint.
-The `100mb.bin` represents the maximum available size of the file (1 to 100).
-
-To conduct an upload test, use the following command in the Terminal:
-
-```shell
-curl https://username:password@vpn.endpoint:443/upload.html \
-  -k --resolve vpn.endpoint:443:127.0.0.1 -F 'data=@./100mb.bin' -o /dev/null
-```
-
-Replace `vpn.endpoint`, `username`, `password`, `127.0.0.1`, and `443` as mentioned above.
-The `./100mb.bin` should point to the file to be transferred, with a maximum file size of 120MB.
-
----
-
 ## Dynamic Reloading of TLS Host Settings
 
 The endpoint supports dynamic reloading of TLS host settings.

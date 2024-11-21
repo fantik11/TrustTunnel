@@ -109,15 +109,14 @@ These commands perform the following actions:
 Alternatively, you can run the endpoint in a docker container:
 
 ```shell
-make docker/setup-and-run
+docker build -t vpn-endpoint:latest . # build an image
+
+docker run -it vpn-endpoint:latest --name vpn-endpoint # create docker container and start it in an interactive mode
+
+docker start -i vpn-endpoint # if you need to start your vpn endpoint again
 ```
 
-This command prepares an endpoint configuration, builds a docker image and runs it
-with the configuration.
-
-The generated certificate (by default, it resides in `certs/cert.pem` or
-`docker/config/certs/cert.pem` in docker case) should be delivered to the client-side
-in some way. See the [Companion Client Repository](#companion-client-repository) for
+The generated certificate (by default, it resides in `certs/cert.pem` or `/VpnLibsEndpoint/certs/cert.pem` inside your docker volume) should be delivered to the client-side in some way. See the [Companion Client Repository](#companion-client-repository) for
 details.
 
 ### Customized Configuration
