@@ -8,8 +8,8 @@ Usage: single_host.sh COMMAND
 
 Commands
     Build and prepare images for running
-        build [--client=<vpn_libs_repo_url>]
-              [--endpoint=<vpn_endpoint_repo_url>]
+        build [--client=<trusttunnel_client_repo_url>]
+              [--endpoint=<trusttunnel_endpoint_repo_url>]
 
     Clean build artifacts
         clean [all]
@@ -29,8 +29,8 @@ MIDDLE_WG_IMAGE="bench-mb-wg"
 LOCAL_IMAGE="bench-ls"
 LOCAL_AG_IMAGE="bench-ls-ag"
 LOCAL_WG_IMAGE="bench-ls-wg"
-ENDPOINT_DIR="vpn-libs-endpoint"
-VPN_LIBS_DIR="vpn-libs"
+ENDPOINT_DIR="trusttunnel-endpoint"
+CLIENT_DIR="trusttunnel-client"
 NETWORK_NAME="bench-network"
 ENDPOINT_HOSTNAME="endpoint.bench"
 RESULTS_DIR="results"
@@ -45,14 +45,14 @@ build_remote() {
 build_middle_ag_rust() {
   local endpoint_url="$1"
 
-  if [ ! -d "$SELF_DIR_PATH/middle-box/adguard-rust/$ENDPOINT_DIR" ]; then
-    git clone "$endpoint_url" "$SELF_DIR_PATH/middle-box/adguard-rust/$ENDPOINT_DIR"
+  if [ ! -d "$SELF_DIR_PATH/middle-box/trusttunnel-rust/$ENDPOINT_DIR" ]; then
+    git clone "$endpoint_url" "$SELF_DIR_PATH/middle-box/trusttunnel-rust/$ENDPOINT_DIR"
   fi
 
   docker build \
     --build-arg ENDPOINT_DIR="$ENDPOINT_DIR" \
     --build-arg ENDPOINT_HOSTNAME="$ENDPOINT_HOSTNAME" \
-    -t "$MIDDLE_AG_RUST_IMAGE" "$SELF_DIR_PATH/middle-box/adguard-rust"
+    -t "$MIDDLE_AG_RUST_IMAGE" "$SELF_DIR_PATH/middle-box/trusttunnel-rust"
 }
 
 build_middle_wg() {
@@ -61,18 +61,18 @@ build_middle_wg() {
 }
 
 build_local() {
-  local vpn_libs_url="$1"
+  local trusttunnel_client_url="$1"
 
   docker build -t "$LOCAL_IMAGE" "$SELF_DIR_PATH/local-side"
 
-  if [ -n "$vpn_libs_url" ]; then
-    if [ ! -d "$SELF_DIR_PATH/local-side/adguard/$VPN_LIBS_DIR" ]; then
-      git clone "$vpn_libs_url" "$SELF_DIR_PATH/local-side/adguard/$VPN_LIBS_DIR"
+  if [ -n "$trusttunnel_client_url" ]; then
+    if [ ! -d "$SELF_DIR_PATH/local-side/trusttunnel/$CLIENT_DIR" ]; then
+      git clone "$trusttunnel_client_url" "$SELF_DIR_PATH/local-side/trusttunnel/$CLIENT_DIR"
     fi
 
     docker build \
-      --build-arg VPN_LIBS_DIR="$VPN_LIBS_DIR" \
-      -t "$LOCAL_AG_IMAGE" "$SELF_DIR_PATH/local-side/adguard"
+      --build-arg CLIENT_DIR="$CLIENT_DIR" \
+      -t "$LOCAL_AG_IMAGE" "$SELF_DIR_PATH/local-side/trusttunnel"
   fi
 
   docker build \
@@ -80,14 +80,14 @@ build_local() {
 }
 
 build() {
-  local vpn_libs_url
-  local vpn_endpoint_url
+  local trusttunnel_client_url
+  local trusttunnel_endpoint_url
 
   for arg in "$@"; do
     if [[ "$arg" == --client=* ]]; then
-      vpn_libs_url=${arg#--client=}
+      trusttunnel_client_url=${arg#--client=}
     elif [[ "$arg" == --endpoint=* ]]; then
-      vpn_endpoint_url=${arg#--endpoint=}
+      trusttunnel_endpoint_url=${arg#--endpoint=}
     else
       echo "$HELP_MSG"
       exit 1
@@ -96,9 +96,9 @@ build() {
 
   docker build -t "$COMMON_IMAGE" "$SELF_DIR_PATH"
 
-  build_local "$vpn_libs_url"
-  if [ -n "$vpn_endpoint_url" ]; then
-    build_middle_ag_rust "$vpn_endpoint_url"
+  build_local "$trusttunnel_client_url"
+  if [ -n "$trusttunnel_endpoint_url" ]; then
+    build_middle_ag_rust "$trusttunnel_endpoint_url"
   fi
   build_middle_wg
   build_remote
@@ -112,7 +112,7 @@ clean_local() {
   docker rm -f $(docker ps -aq -f ancestor="$LOCAL_IMAGE")
 
   if [[ "$everything" == "all" ]]; then
-    rm -rf "${SELF_DIR_PATH:?}/local-side/adguard/$VPN_LIBS_DIR"
+    rm -rf "${SELF_DIR_PATH:?}/local-side/trusttunnel/$CLIENT_DIR"
     docker rmi -f "$LOCAL_AG_IMAGE"
     docker rmi -f "$LOCAL_WG_IMAGE"
     docker rmi -f "$LOCAL_IMAGE"
@@ -125,7 +125,7 @@ clean_middle_ag_rust() {
   docker rm -f $(docker ps -aq -f ancestor="$MIDDLE_AG_RUST_IMAGE")
 
   if [[ "$everything" == "all" ]]; then
-    rm -rf "${SELF_DIR_PATH:?}/middle-box/adguard-rust/$ENDPOINT_DIR"
+    rm -rf "${SELF_DIR_PATH:?}/middle-box/trusttunnel-rust/$ENDPOINT_DIR"
     docker rmi -f "$MIDDLE_AG_RUST_IMAGE"
   fi
 }

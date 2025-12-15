@@ -3,7 +3,7 @@
 The benchmark consists of 3 isolated parts:
 
 * `remote-side` - acts as HTTP and iperf servers for the benchmark
-* `middle-box` - acts as a VPN endpoint host, either WireGuard or AdGuard
+* `middle-box` - acts as a VPN endpoint host, either WireGuard or TrustTunnel
 * `local-side` - acts as a benchmark running host, can establish tunnels to the server
   residing on the remote side through the VPN endpoint
 
@@ -14,7 +14,7 @@ The benchmark consists of 3 isolated parts:
 1) Build docker images
    ```shell
    cd ./bench
-   ./single_host.sh build --client=<vpn-libs.git> --endpoint=<vpn-libs-endpoint.git>
+   ./single_host.sh build --client=<TrustTunnelClient.git> --endpoint=<TrustTunnel.git>
    ```
 
    This command prepares all the parts to run on the current host. To see the full set of
@@ -45,7 +45,7 @@ Assume IP addresses of `host_1`, `host_2` and `host_3` are 1.1.1.1, 2.2.2.2 and 
 2) Running `host_2` as a middle box
    ```shell
    scp Dockerfile user@2.2.2.2:~
-   git clone <vpn-libs-endpoint.git> ./middle-box/adguard-rust/vpn-libs-endpoint
+   git clone <TrustTunnel.git> ./middle-box/trusttunnel-rust/trusttunnel-endpoint
    scp -r middle-box user@2.2.2.2:~
    ssh user@2.2.2.2
    docker build -t bench-common .
@@ -59,11 +59,11 @@ Assume IP addresses of `host_1`, `host_2` and `host_3` are 1.1.1.1, 2.2.2.2 and 
          -p 51820:51820/udp \
          bench-mb-wg
        ```
-    * AdGuard
+    * TrustTunnel
        ```shell
        docker build \
          --build-arg ENDPOINT_HOSTNAME=endpoint.bench \
-         -t bench-mb-ag ./middle-box/adguard-rust/
+         -t bench-mb-ag ./middle-box/trusttunnel-rust/
        docker run -d \
          --cap-add=NET_ADMIN --cap-add=SYS_MODULE --device=/dev/net/tun \
          -p 4433:4433 -p 4433:4433/udp \
@@ -72,7 +72,7 @@ Assume IP addresses of `host_1`, `host_2` and `host_3` are 1.1.1.1, 2.2.2.2 and 
 3) Run the benchmark from `host_3`
    ```shell
    scp Dockerfile user@3.3.3.3:~
-   git clone <vpn-libs.git> ./local-side/adguard/vpn-libs
+   git clone <TrustTunnel.git> ./local-side/trusttunnel/trusttunnel-endpoint
    scp -r local-side user@3.3.3.3:~
    ssh user@3.3.3.3
    docker build -t bench-common .
@@ -88,8 +88,8 @@ Assume IP addresses of `host_1`, `host_2` and `host_3` are 1.1.1.1, 2.2.2.2 and 
       docker build -t bench-ls-wg ./local-side/wireguard
       ./local-side/bench.sh wg bridge 1.1.1.1 results/wg 2.2.2.2
       ```
-   * AdGuard
+   * TrustTunnel
       ```shell
-      docker build -t bench-ls-ag ./local-side/adguard
+      docker build -t bench-ls-ag ./local-side/trusttunnel
       ./local-side/bench.sh ag bridge 1.1.1.1 results/ag 2.2.2.2 endpoint.bench 
       ```

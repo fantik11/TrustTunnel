@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim-bullseye AS build
-ARG ENDPOINT_DIR_NAME="VpnLibsEndpoint"
-ARG RUST_DEFAULT_VERSION="1.77"
+FROM python:3.13-slim-bullseye AS build
+ARG ENDPOINT_DIR_NAME="TrustTunnel"
+ARG RUST_DEFAULT_VERSION="1.85"
 WORKDIR /home
 # Install needed packets
 RUN apt update && \
-    apt install -y build-essential cmake curl make git
+    apt install -y build-essential cmake curl make git libclang-dev
 # Install Rust and Cargo
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain $RUST_DEFAULT_VERSION -y
 ENV PATH="/root/.cargo/bin:$PATH"
@@ -22,7 +22,7 @@ RUN make endpoint/build-wizard
 
 # Copy binaries
 FROM debian AS vpn-endpoint
-ARG ENDPOINT_DIR_NAME="VpnLibsEndpoint"
+ARG ENDPOINT_DIR_NAME="TrustTunnel"
 ARG LOG_LEVEL="info"
 COPY --from=build /home/$ENDPOINT_DIR_NAME/target/release/setup_wizard /bin/
 COPY --from=build /home/$ENDPOINT_DIR_NAME/target/release/vpn_endpoint /bin/

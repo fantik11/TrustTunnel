@@ -13,7 +13,7 @@ fi
 
 COMMON_CONFIG=$(
   cat <<-END
-loglevel = "info"
+loglevel = "debug"
 vpn_mode = "general"
 killswitch_enabled = true
 exclusions = [
@@ -36,7 +36,7 @@ iptables -I OUTPUT -o eth0 -d "$ENDPOINT_IP" -j ACCEPT || echo "Failed to allow 
 iptables -A OUTPUT -o eth0 -j DROP || echo "Failed to set iptables firewall"
 
 if [[ "$MODE" == "tun" ]]; then
-  cat >>standalone_client.toml <<EOF
+  cat >>trusttunnel_client.toml <<EOF
 $COMMON_CONFIG
 
 [listener.tun]
@@ -48,16 +48,16 @@ included_routes = [
 excluded_routes = []
 mtu_size = 1500
 EOF
-  ./standalone_client >>/tmp/vpn.log 2>&1
+  ./trusttunnel_client >>/tmp/vpn.log 2>&1
 else
   for port in $(seq "$SOCKS_PORT_FIRST" "$SOCKS_PORT_LAST"); do
-    cat >>"standalone_client-$port.conf" <<EOF
+    cat >>"trusttunnel_client-$port.conf" <<EOF
 $COMMON_CONFIG
 
 [listener.socks]
 address = "127.0.0.1:$port"
 EOF
-    ./standalone_client --config "./standalone_client-$port.conf" >>"/tmp/vpn-$port.log" 2>&1 &
+    ./trusttunnel_client --config "./trusttunnel_client-$port.conf" >>"/tmp/vpn-$port.log" 2>&1 &
   done
 
   wait

@@ -1,6 +1,4 @@
-# AdGuard VPN Endpoint Binary
-
-[![AdGuardVPN.com](https://img.shields.io/badge/AdGuardVPN.com-Visit-007BFF)](https://adguard-vpn.com/)
+# TrustTunnel Endpoint Binary
 
 A standalone application that allows any user to easily set up their own VPN server.
 

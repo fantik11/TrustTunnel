@@ -183,7 +183,7 @@ run_through_ag() {
 
   local set_up_test_suite_cmd="docker run -it -d --add-host=$endpoint_hostname:$endpoint_ip --network=$network $LOCAL_IMAGE"
   local tear_down_test_suite_cmd=""
-  echo "Running bench through AdGuard http1 proxy..."
+  echo "Running bench through TrustTunnel http1 proxy..."
   run_through_proxy "$set_up_test_suite_cmd" "$tear_down_test_suite_cmd" "$output_dir/http1/" \
     "$remote_ip" "$endpoint_hostname"
   echo "...done"

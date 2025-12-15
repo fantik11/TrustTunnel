@@ -1,21 +1,30 @@
-# AdGuard VPN Endpoint
+<p align="center">
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="https://cdn.adguardcdn.com/website/github.com/TrustTunnel/logo_dark.svg" width="300px" alt="TrustTunnel" />
+<img src="https://cdn.adguardcdn.com/website/github.com/TrustTunnel/logo_light.svg" width="300px" alt="TrustTunnel" />
+</picture>
+</p>
 
-[![AdGuardVPN.com](https://img.shields.io/badge/AdGuardVPN.com-Visit-007BFF)](https://adguard-vpn.com/)
-
-Free, fast, open-source, and secure self-hosted VPN server.
+<p align="center"><a href="https://github.com/TrustTunnel/TrustTunnelClient">Console client</a>
+  · <a href="https://github.com/TrustTunnel/TrustTunnelFlutterClient">Flutter-based app</a>
+  · <a href="https://agrd.io/ios_trusttunnel">App store</a>
+  · <a href="https://agrd.io/android_trusttunnel">Play store</a>
+</p>
 
 ---
 
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Why AdGuard VPN?](#why-adguard-vpn)
-- [Getting Started](#getting-started)
+- [Server Features](#server-features)
+- [Client Features](#client-features)
+- [Getting Started with the endpoint](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Building](#building)
 - [Usage](#usage)
     - [Quick Start](#quick-start)
     - [Customized Configuration](#customized-configuration)
+    - [Generate client config](#generate-client-config)
 - [Companion Client Repository](#companion-client-repository)
 - [Roadmap](#roadmap)
 - [License](#license)
@@ -24,54 +33,66 @@ Free, fast, open-source, and secure self-hosted VPN server.
 
 ## Introduction
 
-Welcome to the AdGuard VPN Endpoint repository!
-This comprehensive and efficient solution allows you to set up and manage your own VPN server.
-The repository includes the following components:
+Welcome to the TrustTunnel repository!
 
-1. **VPN Endpoint Library**: A highly efficient, versatile, and reliable Rust library that
-   implements the VPN endpoint.
+TrustTunnel is free, fast secure and fully self-hosted VPN solution powered by its own unique VPN protocol.
 
-2. **VPN Endpoint Binary**: A standalone application that makes it easy for any user to set
-   up their own VPN server.
+TrustTunnel project includes VPN endpoint (this repository), [library and CLI for client](https://github.com/TrustTunnel/TrustTunnelClient) and [GUI application](https://github.com/TrustTunnelFlutterClient)
 
-3. **Setup-Wizard Tool**: A user-friendly tool that simplifies the configuration process by guiding
-   you through the necessary steps.
+## Server Features
 
-## Why AdGuard VPN?
-
-- **AdGuard Protocol**: AdGuard VPN utilizes
-  [the AdGuard protocol](https://adguard-vpn.com/kb/general/adguard-vpn-protocol/),
-  which is compatible with HTTP/1.1, HTTP/2, and QUIC.
+- **VPN Protocol**: The library implements the VPN protocol compatible
+  with HTTP/1.1, HTTP/2, and QUIC.
   By mimicking regular network traffic, it becomes more difficult for government regulators to
   detect and block.
 
-- **Flexible Traffic Tunneling**: AdGuard VPN can tunnel TCP, UDP, and ICMP traffic to and
+- **Flexible Traffic Tunneling**: TrustTunnel can tunnel TCP, UDP, and ICMP traffic to and
   from the client.
 
-- **Platform Compatibility**: It is compatible with Linux and macOS systems.
+- **Platform Compatibility**: Server is compatible with Linux and macOS systems. Client exists for Android, Apple, Windows and Linux platforms.
 
-- **Companion Client Repository**: An accompanying client is available in a separate repository,
-  allowing you to connect to your VPN server seamlessly.
+---
 
-## Getting Started
+## Client Features
+
+- **Traffic Tunneling**: The library is capable of tunneling TCP, UDP, and ICMP traffic from the
+  client to the endpoint and back.
+
+- **Cross-Platform Support**: It supports Linux, macOS, and Windows platforms, providing a
+  consistent experience across different operating systems.
+
+- **System-Wide Tunnel and SOCKS5 Proxy**: It can be set up as a system-wide tunnel, utilizing a
+  virtual network interface, as well as a SOCKS5 proxy.
+
+- **Split Tunneling**: The library supports split tunneling, allowing users to exclude connections
+  to certain domains or hosts from routing through the VPN endpoint, or vice versa, only routing
+  connections to specific domains or hosts through the endpoint based on an exclusion list.
+
+- **Custom DNS Upstream**: Users can specify a custom DNS upstream, which is used for DNS queries
+  routed through the VPN endpoint.
+
+---
+
+## Getting Started with the endpoint
 
 ### Prerequisites
 
 Before proceeding, ensure that you have Rust installed on your system.
 Visit the [Rust installation page](https://www.rust-lang.org/tools/install) for
 detailed instructions.
-The minimum supported version of the Rust compiler is 1.67.
+The minimum supported version of the Rust compiler is 1.85.
+`libclang` library 9.0 or higher is also required.
 This project is compatible with Linux and macOS systems.
 
 ### Building
 
-To install AdGuard VPN Endpoint, follow these steps:
+To install TrustTunnel Endpoint, follow these steps:
 
 1. Clone the repository:
 
    ```shell
-   git clone https://github.com/AdguardTeam/VpnLibsEndpoint.git
-   cd VpnLibsEndpoint
+   git clone https://github.com/TrustTunnel/TrustTunnel.git
+   cd TrustTunnel
    ```
 
 2. Build the binaries using Cargo:
@@ -89,9 +110,11 @@ To install AdGuard VPN Endpoint, follow these steps:
 To quickly configure and launch the VPN endpoint, run the following commands:
 
 ```shell
-make endpoint/setup  # You can skip it if you have already configured the endpoint earlier
+make ENDPOINT_HOSTNAME="example.org" endpoint/setup  # You can skip it if you have already configured the endpoint earlier
 make endpoint/run
 ```
+
+Check `Makefile` for available configuration variables.
 
 These commands perform the following actions:
 
@@ -116,7 +139,7 @@ docker run -it vpn-endpoint:latest --name vpn-endpoint # create docker container
 docker start -i vpn-endpoint # if you need to start your vpn endpoint again
 ```
 
-The generated certificate (by default, it resides in `certs/cert.pem` or `/VpnLibsEndpoint/certs/cert.pem` inside your docker volume) should be delivered to the client-side in some way. See the [Companion Client Repository](#companion-client-repository) for
+The generated certificate (by default, it resides in `certs/cert.pem` or `/TrustTunnel/certs/cert.pem` inside your docker volume) should be delivered to the client-side in some way. See the [Companion Client Repository](#companion-client-repository) for
 details.
 
 ### Customized Configuration
@@ -136,11 +159,28 @@ file.
 > including descriptions.
 > You can freely customize them if you are confident in your understanding of the configuration.
 
+### Generate client config
+
+The endpoint binary is capable of generating the client configuration for a particular user.
+
+This configuration contains all necessary information that is required to connect to the endpoint.
+
+To generate the configuration run the following command:
+
+```shell
+# <client_name> - name of the client those credentials will be included in the configuration
+# <public_ip_and_port> - `ip:port` that the user will use to connect to the endpoint
+cargo run --bin vpn_endpoint -- <lib-settings> <host-settings> -c <client_name> -a <public_ip_and_port>
+# or
+make endpoint/gen_client_config CLIENT_NAME="<client_name>" ENDPOINT_ADDRESS="<public_ip_and_port"
+```
+
+This will print the configuration with the credentials for client with name <client_name> 
+
 ## Companion Client Repository
 
 To connect to your newly set-up VPN server, you need a client.
-The companion client's code can be found
-in [this repository](https://github.com/AdguardTeam/VpnLibs.git).
+You have a choice to use a [CLI client](https://github.com/TrustTunnel/TrustTunnelClient.git) or a [GUI client](https://github.com/TrustTunnel/TrustTunnelFlutterClient.git)
 
 ## Roadmap
 

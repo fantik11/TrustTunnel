@@ -5,12 +5,12 @@ endif
 LOG_LEVEL ?= trace
 CONFIG_FILE ?= vpn.toml
 HOSTS_CONFIG_FILE ?= hosts.toml
-DOCKER_IMAGE_NAME ?= adguard-vpn-endpoint
-ENDPOINT_URL ?= git@github.com:AdguardTeam/VpnLibsEndpointPrivate.git
+DOCKER_IMAGE_NAME ?= trusttunnel-endpoint
+ENDPOINT_URL ?= git@github.com:TrustTunnel/TrustTunnel.git
 ENDPOINT_VERSION ?= master
 ENDPOINT_HOSTNAME ?= vpn.endpoint
 DOCKER_DIR = docker
-DOCKER_ENDPOINT_DIR = vpn-libs-endpoint
+DOCKER_ENDPOINT_DIR = TrustTunnel
 DOCKER_ENDPOINT_CONFIG_DIR = config
 LISTEN_ADDRESS ?= 0.0.0.0
 LISTEN_PORT ?= 443
@@ -40,6 +40,14 @@ endpoint/build:
 endpoint/run: endpoint/build
 	cargo run $(CARGO_BUILD_TYPE) --bin vpn_endpoint -- \
 		-l "$(LOG_LEVEL)" "$(CONFIG_FILE)" "$(HOSTS_CONFIG_FILE)"
+
+.PHONY: endpoint/gen_client_config
+## Generate the config for specified client to be used with vpn client and exit
+endpoint/gen_client_config:
+	$(if $(CLIENT_NAME),,$(error CLIENT_NAME is not set. Specify the client name to generate the config for))
+	$(if $(ENDPOINT_ADDRESS),,$(error ENDPOINT_ADDRESS is not set. Set it to `ip:port` that client is going to use to connect to the endpoint))
+	cargo run $(CARGO_BUILD_TYPE) --bin vpn_endpoint -- \
+		-c "$(CLIENT_NAME)" --address "$(ENDPOINT_ADDRESS)" "$(CONFIG_FILE)" "$(HOSTS_CONFIG_FILE)"
 
 .PHONY: endpoint/clean
 ## Clean cargo artifacts
