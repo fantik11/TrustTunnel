@@ -62,23 +62,39 @@ Build on Linux:
             VERSION=$(cat endpoint/Cargo.toml | grep "version = " | head -n 1 | sed -e 's/version = "\(.*\)"/\1/')
 
             pushd target/aarch64-unknown-linux-musl/release/
+              llvm-objcopy --only-keep-debug trusttunnel_endpoint trusttunnel_endpoint.debug
               llvm-strip trusttunnel_endpoint
+              llvm-objcopy --add-gnu-debuglink=trusttunnel_endpoint.debug trusttunnel_endpoint
+              llvm-objcopy --only-keep-debug setup_wizard setup_wizard.debug
               llvm-strip setup_wizard
+              llvm-objcopy --add-gnu-debuglink=setup_wizard.debug setup_wizard
               cp ${ENDPOINT_ROOT}/LICENSE .
               cp ${ENDPOINT_ROOT}/scripts/trusttunnel.service.template .
               NAME=trusttunnel-v${VERSION}-linux-aarch64
               tar zcf ${NAME}.tar.gz --transform "s,^,${NAME}/," trusttunnel_endpoint setup_wizard LICENSE trusttunnel.service.template
               mv ${NAME}.tar.gz ${ENDPOINT_ROOT}/build_linux
+
+              NAME_DBG=${NAME}-dbgsym
+              tar zcf ${NAME_DBG}.tar.gz --transform "s,^,${NAME_DBG}/," trusttunnel_endpoint.debug setup_wizard.debug
+              mv ${NAME_DBG}.tar.gz ${ENDPOINT_ROOT}/build_linux
             popd
 
             pushd target/x86_64-unknown-linux-musl/release/
+              llvm-objcopy --only-keep-debug trusttunnel_endpoint trusttunnel_endpoint.debug
               llvm-strip trusttunnel_endpoint
+              llvm-objcopy --add-gnu-debuglink=trusttunnel_endpoint.debug trusttunnel_endpoint
+              llvm-objcopy --only-keep-debug setup_wizard setup_wizard.debug
               llvm-strip setup_wizard
+              llvm-objcopy --add-gnu-debuglink=setup_wizard.debug setup_wizard
               cp ${ENDPOINT_ROOT}/LICENSE .
               cp ${ENDPOINT_ROOT}/scripts/trusttunnel.service.template .
               NAME=trusttunnel-v${VERSION}-linux-x86_64
               tar zcf ${NAME}.tar.gz --transform "s,^,${NAME}/," trusttunnel_endpoint setup_wizard LICENSE trusttunnel.service.template
               mv ${NAME}.tar.gz ${ENDPOINT_ROOT}/build_linux
+
+              NAME_DBG=${NAME}-dbgsym
+              tar zcf ${NAME_DBG}.tar.gz --transform "s,^,${NAME_DBG}/," trusttunnel_endpoint.debug setup_wizard.debug
+              mv ${NAME_DBG}.tar.gz ${ENDPOINT_ROOT}/build_linux
             popd
   requirements:
     - adg-privileged-docker
@@ -166,6 +182,8 @@ Deploy artifacts:
             gh release create ${TAG} -t "${TAG}" -n "See [CHANGELOG.md](${CHANGELOG_URL}) for the list of changes."
             gh release upload ${TAG} ../build_linux/trusttunnel-v${VERSION}-linux-x86_64.tar.gz
             gh release upload ${TAG} ../build_linux/trusttunnel-v${VERSION}-linux-aarch64.tar.gz
+            gh release upload ${TAG} ../build_linux/trusttunnel-v${VERSION}-linux-x86_64-dbgsym.tar.gz
+            gh release upload ${TAG} ../build_linux/trusttunnel-v${VERSION}-linux-aarch64-dbgsym.tar.gz
   requirements:
     - adg-privileged-docker
   artifact-subscriptions:
