@@ -19,11 +19,21 @@ pub(crate) struct Metrics {
     client_sessions: prometheus::IntGaugeVec,
     inbound_traffic: prometheus::IntCounterVec,
     outbound_traffic: prometheus::IntCounterVec,
+    outbound_tcp_sockets: prometheus::IntGauge,
+    outbound_udp_sockets: prometheus::IntGauge,
 }
 
 pub(crate) struct ClientSessionsCounter {
     metrics: Arc<Metrics>,
     protocol: Protocol,
+}
+
+pub(crate) struct OutboundTcpSocketCounter {
+    metrics: Arc<Metrics>,
+}
+
+pub(crate) struct OutboundUdpSocketCounter {
+    metrics: Arc<Metrics>,
 }
 
 impl Metrics {
@@ -51,12 +61,32 @@ impl Metrics {
                 registry,
             )
             .map_err(prometheus_to_io_error)?,
+            outbound_tcp_sockets: prometheus::register_int_gauge_with_registry!(
+                "outbound_tcp_sockets",
+                "Number of active outbound TCP connections",
+                registry,
+            )
+            .map_err(prometheus_to_io_error)?,
+            outbound_udp_sockets: prometheus::register_int_gauge_with_registry!(
+                "outbound_udp_sockets",
+                "Number of active outbound UDP sockets",
+                registry,
+            )
+            .map_err(prometheus_to_io_error)?,
             _registry: registry,
         }))
     }
 
     pub fn client_sessions_counter(self: Arc<Self>, protocol: Protocol) -> ClientSessionsCounter {
         ClientSessionsCounter::new(self, protocol)
+    }
+
+    pub fn outbound_tcp_socket_counter(self: Arc<Self>) -> OutboundTcpSocketCounter {
+        OutboundTcpSocketCounter::new(self)
+    }
+
+    pub fn outbound_udp_socket_counter(self: Arc<Self>) -> OutboundUdpSocketCounter {
+        OutboundUdpSocketCounter::new(self)
     }
 
     pub fn add_inbound_bytes(&self, protocol: Protocol, n: usize) {
@@ -99,6 +129,32 @@ impl Drop for ClientSessionsCounter {
             .client_sessions
             .with_label_values(&[self.protocol.as_str()])
             .dec();
+    }
+}
+
+impl OutboundTcpSocketCounter {
+    fn new(metrics: Arc<Metrics>) -> Self {
+        metrics.outbound_tcp_sockets.inc();
+        Self { metrics }
+    }
+}
+
+impl Drop for OutboundTcpSocketCounter {
+    fn drop(&mut self) {
+        self.metrics.outbound_tcp_sockets.dec();
+    }
+}
+
+impl OutboundUdpSocketCounter {
+    fn new(metrics: Arc<Metrics>) -> Self {
+        metrics.outbound_udp_sockets.inc();
+        Self { metrics }
+    }
+}
+
+impl Drop for OutboundUdpSocketCounter {
+    fn drop(&mut self) {
+        self.metrics.outbound_udp_sockets.dec();
     }
 }
 

@@ -2,16 +2,15 @@ use crate::forwarder::TcpConnector;
 use crate::http_codec::HttpCodec;
 use crate::net_utils::TcpDestination;
 use crate::pipe::DuplexPipe;
-use crate::shutdown::Shutdown;
 use crate::tcp_forwarder::TcpForwarder;
 use crate::tls_demultiplexer::Protocol;
-use crate::{forwarder, http1_codec, http_codec, log_id, log_utils, pipe, settings, tunnel};
+use crate::{core, forwarder, http1_codec, http_codec, log_id, log_utils, pipe, tunnel};
 use bytes::{BufMut, BytesMut};
 use std::io;
 use std::io::ErrorKind;
 use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 static ORIGINAL_PROTOCOL_HEADER: http::HeaderName =
     http::HeaderName::from_static("x-original-protocol");
@@ -22,14 +21,13 @@ struct SessionManager {
 }
 
 pub(crate) async fn listen(
-    settings: Arc<settings::Settings>,
-    shutdown: Arc<Mutex<Shutdown>>,
+    context: Arc<core::Context>,
     mut codec: Box<dyn HttpCodec>,
     sni: String,
     log_id: log_utils::IdChain<u64>,
 ) {
     let (mut shutdown_notification, _shutdown_completion) = {
-        let shutdown = shutdown.lock().unwrap();
+        let shutdown = context.shutdown.lock().unwrap();
         (shutdown.notification_handler(), shutdown.completion_guard())
     };
 
@@ -40,7 +38,7 @@ pub(crate) async fn listen(
                 Err(e) => log_id!(debug, log_id, "Shutdown notification failure: {}", e),
             }
         },
-        _ = listen_inner(settings, codec.as_mut(), sni, &log_id) => (),
+        _ = listen_inner(context, codec.as_mut(), sni, &log_id) => (),
     }
 
     if let Err(e) = codec.graceful_shutdown().await {
@@ -49,25 +47,25 @@ pub(crate) async fn listen(
 }
 
 async fn listen_inner(
-    settings: Arc<settings::Settings>,
+    context: Arc<core::Context>,
     codec: &mut dyn HttpCodec,
     sni: String,
     log_id: &log_utils::IdChain<u64>,
 ) {
     let manager = Arc::new(SessionManager::default());
-    let timeout = settings.connection_establishment_timeout;
+    let timeout = context.settings.connection_establishment_timeout;
     loop {
         match tokio::time::timeout(timeout, codec.listen()).await {
             Ok(Ok(Some(x))) => {
                 tokio::spawn({
-                    let settings = settings.clone();
+                    let context = context.clone();
                     let manager = manager.clone();
                     let protocol = codec.protocol();
                     let sni = sni.clone();
                     let log_id = log_id.clone();
                     async move {
                         manager.active_streams_num.fetch_add(1, Ordering::AcqRel);
-                        if let Err(e) = handle_stream(settings, x, protocol, sni, &log_id).await {
+                        if let Err(e) = handle_stream(context, x, protocol, sni, &log_id).await {
                             log_id!(debug, log_id, "Request failed: {}", e);
                         }
                         manager.active_streams_num.fetch_sub(1, Ordering::AcqRel);
@@ -103,7 +101,7 @@ async fn listen_inner(
 }
 
 async fn handle_stream(
-    core_settings: Arc<settings::Settings>,
+    context: Arc<core::Context>,
     stream: Box<dyn http_codec::Stream>,
     protocol: Protocol,
     sni: String,
@@ -112,8 +110,8 @@ async fn handle_stream(
     let (request, respond) = stream.split();
     log_id!(trace, log_id, "Received request: {:?}", request.request());
 
-    let forwarder = Box::new(TcpForwarder::new(core_settings.clone()));
-    let settings = core_settings.reverse_proxy.as_ref().unwrap();
+    let forwarder = Box::new(TcpForwarder::new(context.clone()));
+    let settings = context.settings.reverse_proxy.as_ref().unwrap();
     let (mut server_source, mut server_sink) = forwarder
         .connect(
             log_id.clone(),
@@ -198,5 +196,5 @@ async fn handle_stream(
         |_, _| (),
     );
 
-    pipe.exchange(core_settings.tcp_connections_timeout).await
+    pipe.exchange(context.settings.tcp_connections_timeout).await
 }

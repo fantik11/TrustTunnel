@@ -24,7 +24,7 @@ pub(crate) struct Socks5Forwarder {
 }
 
 struct TcpConnector {
-    core_settings: Arc<Settings>,
+    context: Arc<core::Context>,
 }
 
 struct DatagramSource {
@@ -39,7 +39,7 @@ struct DatagramSink {
 }
 
 struct DatagramTransceiverShared {
-    core_settings: Arc<Settings>,
+    context: Arc<core::Context>,
     /// Key is the source address received in packet from client
     associations: Mutex<HashMap<SocketAddr, UdpAssociation>>,
     new_socket_tx: mpsc::Sender<()>,
@@ -52,6 +52,7 @@ type UdpAssociationSocket = socks5_client::UdpAssociation<TcpStream>;
 struct UdpAssociation {
     socket: Arc<UdpAssociationSocket>,
     peers: HashSet<SocketAddr>,
+    _metrics_guard: crate::metrics::OutboundUdpSocketCounter,
 }
 
 struct SocketError {
@@ -60,7 +61,7 @@ struct SocketError {
 }
 
 struct DatagramMuxAuthenticator {
-    core_settings: Arc<Settings>,
+    context: Arc<core::Context>,
 }
 
 impl Socks5Forwarder {
@@ -79,7 +80,7 @@ impl forwarder::UdpDatagramPipeShared for DatagramTransceiverShared {
         }
 
         let socket = match socks5_client::connect(
-            TcpStream::connect(socks_settings(&self.core_settings).address).await?,
+            TcpStream::connect(socks_settings(&self.context.settings).address).await?,
             self.auth.clone(),
             socks5_client::Request::UdpAssociate,
         )
@@ -109,11 +110,13 @@ impl forwarder::UdpDatagramPipeShared for DatagramTransceiverShared {
             }
         };
 
+        let metrics_guard = self.context.metrics.clone().outbound_udp_socket_counter();
         self.associations.lock().unwrap().insert(
             meta.source,
             UdpAssociation {
                 socket,
                 peers: HashSet::from([meta.destination]),
+                _metrics_guard: metrics_guard,
             },
         );
 
@@ -143,13 +146,13 @@ impl forwarder::UdpDatagramPipeShared for DatagramTransceiverShared {
 impl Forwarder for Socks5Forwarder {
     fn tcp_connector(&self) -> Box<dyn forwarder::TcpConnector> {
         Box::new(TcpConnector {
-            core_settings: self.context.settings.clone(),
+            context: self.context.clone(),
         })
     }
 
     fn datagram_mux_authenticator(&self) -> Box<dyn forwarder::DatagramMultiplexerAuthenticator> {
         Box::new(DatagramMuxAuthenticator {
-            core_settings: self.context.settings.clone(),
+            context: self.context.clone(),
         })
     }
 
@@ -160,7 +163,7 @@ impl Forwarder for Socks5Forwarder {
     ) -> io::Result<UdpMultiplexer> {
         let (tx, rx) = mpsc::channel(1);
         let shared = Arc::new(DatagramTransceiverShared {
-            core_settings: self.context.settings.clone(),
+            context: self.context.clone(),
             associations: Default::default(),
             new_socket_tx: tx,
             auth: meta
@@ -223,7 +226,7 @@ impl forwarder::TcpConnector for TcpConnector {
             }
         };
 
-        let stream = match TcpStream::connect(socks_settings(&self.core_settings).address).await {
+        let stream = match TcpStream::connect(socks_settings(&self.context.settings).address).await {
             Ok(s) => s,
             Err(e) => return Err(tunnel::ConnectionError::Io(e)),
         };
@@ -232,7 +235,7 @@ impl forwarder::TcpConnector for TcpConnector {
             stream,
             meta.auth
                 .map(|x| {
-                    if socks_settings(&self.core_settings).extended_auth {
+                    if socks_settings(&self.context.settings).extended_auth {
                         make_extended_auth(
                             x,
                             &meta.tls_domain,
@@ -250,7 +253,8 @@ impl forwarder::TcpConnector for TcpConnector {
         .await
         {
             Ok(socks5_client::ConnectResult::TcpConnection(stream)) => {
-                Ok(TcpForwarder::pipe_from_stream(stream, id))
+                let metrics_guard = self.context.metrics.clone().outbound_tcp_socket_counter();
+                Ok(TcpForwarder::pipe_from_stream(stream, id, metrics_guard))
             }
             Ok(socks5_client::ConnectResult::UdpAssociation(_)) => unreachable!(),
             Ok(socks5_client::ConnectResult::Failure(
@@ -292,11 +296,11 @@ impl forwarder::DatagramMultiplexerAuthenticator for DatagramMuxAuthenticator {
         user_agent: Option<&'_ str>,
     ) -> Result<(), tunnel::ConnectionError> {
         match socks5_client::connect(
-            TcpStream::connect(socks_settings(&self.core_settings).address)
+            TcpStream::connect(socks_settings(&self.context.settings).address)
                 .await
                 .map_err(tunnel::ConnectionError::Io)?,
             Some(
-                if socks_settings(&self.core_settings).extended_auth {
+                if socks_settings(&self.context.settings).extended_auth {
                     make_extended_auth(auth, tls_domain, &client_address, user_agent)
                 } else {
                     make_auth(auth)

@@ -18,7 +18,7 @@ impl DirectForwarder {
 
 impl Forwarder for DirectForwarder {
     fn tcp_connector(&self) -> Box<dyn forwarder::TcpConnector> {
-        Box::new(TcpForwarder::new(self.context.settings.clone()))
+        Box::new(TcpForwarder::new(self.context.clone()))
     }
 
     fn datagram_mux_authenticator(&self) -> Box<dyn forwarder::DatagramMultiplexerAuthenticator> {
@@ -45,7 +45,7 @@ impl Forwarder for DirectForwarder {
         id: log_utils::IdChain<u64>,
         _: forwarder::UdpMultiplexerMeta,
     ) -> io::Result<UdpMultiplexer> {
-        udp_forwarder::make_multiplexer(id)
+        udp_forwarder::make_multiplexer(self.context.clone(), id)
     }
 
     fn make_icmp_datagram_multiplexer(

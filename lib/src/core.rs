@@ -496,8 +496,7 @@ impl Core {
             }
             net_utils::Channel::ReverseProxy => {
                 reverse_proxy::listen(
-                    core_settings.clone(),
-                    context.shutdown.clone(),
+                    context.clone(),
                     match Self::make_tcp_http_codec(
                         tls_connection_meta.protocol,
                         core_settings,
@@ -588,8 +587,7 @@ impl Core {
                 let sni = tls_connection_meta.sni.clone();
 
                 reverse_proxy::listen(
-                    context.settings.clone(),
-                    context.shutdown.clone(),
+                    context.clone(),
                     Box::new(Http3Codec::new(socket, client_id.clone())),
                     sni,
                     client_id,
@@ -664,8 +662,7 @@ impl Core {
         let mut tunnel = Tunnel::new(
             context.clone(),
             Box::new(HttpDownstream::new(
-                context.settings.clone(),
-                context.shutdown.clone(),
+                context.clone(),
                 codec,
                 server_name,
             )),

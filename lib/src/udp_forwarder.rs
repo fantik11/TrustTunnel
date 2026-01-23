@@ -1,5 +1,6 @@
 use crate::forwarder::UdpMultiplexer;
-use crate::{datagram_pipe, downstream, forwarder, log_id, log_utils, net_utils};
+use crate::metrics::OutboundUdpSocketCounter;
+use crate::{core, datagram_pipe, downstream, forwarder, log_id, log_utils, net_utils};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::collections::hash_map::Entry;
@@ -16,12 +17,14 @@ use tokio::sync;
 struct Connection {
     socket: Arc<UdpSocket>,
     being_listened: bool,
+    _metrics_guard: OutboundUdpSocketCounter,
 }
 
 type Connections = HashMap<forwarder::UdpDatagramMeta, Connection>;
 
 struct MultiplexerShared {
     connections: Mutex<Connections>,
+    context: Arc<core::Context>,
 }
 
 struct MultiplexerSource {
@@ -46,9 +49,13 @@ enum PollStatus {
     SocketError(SocketError),
 }
 
-pub(crate) fn make_multiplexer(id: log_utils::IdChain<u64>) -> io::Result<UdpMultiplexer> {
+pub(crate) fn make_multiplexer(
+    context: Arc<core::Context>,
+    id: log_utils::IdChain<u64>,
+) -> io::Result<UdpMultiplexer> {
     let shared = Arc::new(MultiplexerShared {
         connections: Mutex::new(Default::default()),
+        context,
     });
     let (wake_tx, wake_rx) = sync::mpsc::channel(1);
 
@@ -171,9 +178,11 @@ impl forwarder::UdpDatagramPipeShared for MultiplexerShared {
         {
             Entry::Occupied(_) => Err(io::Error::new(ErrorKind::Other, "Already present")),
             Entry::Vacant(e) => {
+                let metrics_guard = self.context.metrics.clone().outbound_udp_socket_counter();
                 e.insert(Connection {
                     socket: Arc::new(make_udp_socket(&meta.destination)?),
                     being_listened: false,
+                    _metrics_guard: metrics_guard,
                 });
                 Ok(())
             }

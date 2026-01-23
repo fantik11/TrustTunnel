@@ -1,7 +1,7 @@
 use crate::forwarder::TcpConnector;
+use crate::metrics::OutboundTcpSocketCounter;
 use crate::net_utils::TcpDestination;
-use crate::settings::Settings;
-use crate::{forwarder, log_id, log_utils, net_utils, pipe, tunnel};
+use crate::{core, forwarder, log_id, log_utils, net_utils, pipe, tunnel};
 use async_trait::async_trait;
 use bytes::{Buf, Bytes};
 use std::io;
@@ -13,12 +13,13 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 
 pub(crate) struct TcpForwarder {
-    core_settings: Arc<Settings>,
+    context: Arc<core::Context>,
 }
 
 struct StreamRx {
     rx: OwnedReadHalf,
     id: log_utils::IdChain<u64>,
+    _metrics_guard: OutboundTcpSocketCounter,
 }
 
 struct StreamTx {
@@ -32,17 +33,22 @@ struct StreamTx {
 }
 
 impl TcpForwarder {
-    pub fn new(core_settings: Arc<Settings>) -> Self {
-        Self { core_settings }
+    pub fn new(context: Arc<core::Context>) -> Self {
+        Self { context }
     }
 
-    pub fn pipe_from_stream(
+    pub(crate) fn pipe_from_stream(
         stream: TcpStream,
         id: log_utils::IdChain<u64>,
+        metrics_guard: OutboundTcpSocketCounter,
     ) -> (Box<dyn pipe::Source>, Box<dyn pipe::Sink>) {
         let (rx, tx) = stream.into_split();
         (
-            Box::new(StreamRx { rx, id: id.clone() }),
+            Box::new(StreamRx {
+                rx,
+                id: id.clone(),
+                _metrics_guard: metrics_guard,
+            }),
             Box::new(StreamTx {
                 tx,
                 eof_pending: false,
@@ -77,12 +83,12 @@ impl TcpConnector for TcpForwarder {
                 let mut status = None;
                 for a in resolved {
                     let ip = a.ip();
-                    if ip.is_ipv6() && !self.core_settings.ipv6_available {
+                    if ip.is_ipv6() && !self.context.settings.ipv6_available {
                         continue;
                     }
 
                     if net_utils::is_global_ip(&ip)
-                        || self.core_settings.allow_private_network_connections
+                        || self.context.settings.allow_private_network_connections
                     {
                         status = Some(SelectionStatus::Suitable(a));
                         break;
@@ -118,6 +124,7 @@ impl TcpConnector for TcpForwarder {
         };
 
         log_id!(trace, id, "Connecting to peer: {}", peer);
+        let metrics_guard = self.context.metrics.clone().outbound_tcp_socket_counter();
         TcpStream::connect(peer)
             .await
             .and_then(|s| {
@@ -133,7 +140,7 @@ impl TcpConnector for TcpForwarder {
                         local_addr.port()
                     );
                 }
-                TcpForwarder::pipe_from_stream(s, id)
+                TcpForwarder::pipe_from_stream(s, id, metrics_guard)
             })
             .map_err(io_to_connection_error)
     }

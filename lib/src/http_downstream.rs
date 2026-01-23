@@ -1,13 +1,12 @@
 use crate::downstream::Downstream;
 use crate::http_codec::HttpCodec;
 use crate::net_utils::TcpDestination;
-use crate::settings::Settings;
-use crate::shutdown::Shutdown;
 use crate::tls_demultiplexer::Protocol;
 use crate::{
-    authentication, datagram_pipe, downstream, http_codec, http_datagram_codec, http_demultiplexer,
-    http_forwarded_stream, http_icmp_codec, http_ping_handler, http_speedtest_handler,
-    http_udp_codec, log_id, log_utils, net_utils, pipe, reverse_proxy, tunnel,
+    authentication, core, datagram_pipe, downstream, http_codec, http_datagram_codec,
+    http_demultiplexer, http_forwarded_stream, http_icmp_codec, http_ping_handler,
+    http_speedtest_handler, http_udp_codec, log_id, log_utils, net_utils, pipe, reverse_proxy,
+    tunnel,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -17,7 +16,7 @@ use std::collections::LinkedList;
 use std::io;
 use std::io::ErrorKind;
 use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 const HEALTH_CHECK_AUTHORITY: &str = "_check";
 const UDP_AUTHORITY: &str = "_udp2";
@@ -32,8 +31,7 @@ const WARNING_HEADER_NAME: &str = "X-Warning";
 const DNS_WARNING_HEADER_NAME: &str = "X-Adguard-Vpn-Error";
 
 pub(crate) struct HttpDownstream {
-    core_settings: Arc<Settings>,
-    shutdown: Arc<Mutex<Shutdown>>,
+    context: Arc<core::Context>,
     codec: Box<dyn HttpCodec>,
     tls_domain: String,
     request_demux: HttpDemux,
@@ -67,17 +65,15 @@ struct PendingRequest {
 
 impl HttpDownstream {
     pub fn new(
-        core_settings: Arc<Settings>,
-        shutdown: Arc<Mutex<Shutdown>>,
+        context: Arc<core::Context>,
         codec: Box<dyn HttpCodec>,
         tls_domain: String,
     ) -> Self {
         Self {
-            core_settings: core_settings.clone(),
-            shutdown,
+            request_demux: HttpDemux::new(context.settings.clone()),
+            context,
             codec,
             tls_domain,
-            request_demux: HttpDemux::new(core_settings),
         }
     }
 }
@@ -109,8 +105,7 @@ impl Downstream for HttpDownstream {
             );
 
             let protocol = self.protocol();
-            let settings = self.core_settings.clone();
-            let shutdown = self.shutdown.clone();
+            let context = self.context.clone();
             let channel = self.request_demux.select(self.protocol(), request);
             log_id!(
                 trace,
@@ -130,9 +125,9 @@ impl Downstream for HttpDownstream {
                     log_id!(trace, stream_id, "HTTP downstream: ping request");
                     tokio::spawn(async move {
                         http_ping_handler::listen(
-                            shutdown.clone(),
+                            context.shutdown.clone(),
                             Box::new(http_codec::stream_into_codec(stream, protocol)),
-                            settings.tls_handshake_timeout,
+                            context.settings.tls_handshake_timeout,
                             stream_id,
                         )
                         .await
@@ -142,9 +137,9 @@ impl Downstream for HttpDownstream {
                     log_id!(trace, stream_id, "HTTP downstream: speedtest request");
                     tokio::spawn(async move {
                         http_speedtest_handler::listen(
-                            shutdown.clone(),
+                            context.shutdown.clone(),
                             Box::new(http_codec::stream_into_codec(stream, protocol)),
-                            settings.tls_handshake_timeout,
+                            context.settings.tls_handshake_timeout,
                             stream_id,
                         )
                         .await
@@ -156,8 +151,7 @@ impl Downstream for HttpDownstream {
                         let sni = self.tls_domain.clone();
                         async move {
                             reverse_proxy::listen(
-                                settings,
-                                shutdown.clone(),
+                                context,
                                 Box::new(http_codec::stream_into_codec(stream, protocol)),
                                 sni,
                                 stream_id,
