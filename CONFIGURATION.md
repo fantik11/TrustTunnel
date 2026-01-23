@@ -158,7 +158,7 @@ direct = {}
 
 # Metrics settings (optional)
 # [metrics]
-# address = "0.0.0.0:1987"
+# address = "127.0.0.1:1987"
 # request_timeout_secs = 3
 ```
 
@@ -356,13 +356,13 @@ Optional. Enables Prometheus-compatible metrics endpoint.
 
 ```toml
 [metrics]
-address = "0.0.0.0:1987"
+address = "127.0.0.1:1987"
 request_timeout_secs = 3
 ```
 
 | Setting | Type | Default | Description |
 | ------- | ---- | ------- | ----------- |
-| `address` | String | `0.0.0.0:1987` | Metrics endpoint address |
+| `address` | String | `127.0.0.1:1987` | Metrics endpoint address |
 | `request_timeout_secs` | Integer | `3` | Request timeout in seconds |
 
 ---

@@ -15,13 +15,13 @@ use vpn_libs_endpoint::Settings;
 
 let settings = Settings::builder()
     .metrics(MetricsSettings {
-        address: "0.0.0.0:1987".parse().unwrap(),
+        address: "127.0.0.1:1987".parse().unwrap(),
         request_timeout: Duration::from_secs(3),
     })
     .build();
 ```
 
-Default metrics endpoint: `http://0.0.0.0:1987/metrics`
+Default metrics endpoint: `http://127.0.0.1:1987/metrics`
 
 ## Endpoints
 

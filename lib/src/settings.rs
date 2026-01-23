@@ -755,7 +755,7 @@ impl MetricsSettings {
     }
 
     pub fn default_listen_address() -> SocketAddr {
-        (Ipv4Addr::UNSPECIFIED, 1987).into()
+        (Ipv4Addr::LOCALHOST, 1987).into()
     }
 
     pub fn default_request_timeout() -> Duration {
