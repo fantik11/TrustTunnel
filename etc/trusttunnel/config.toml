@@ -1,0 +1,24 @@
+'''# The address and port to listen on for incoming VPN connections.
+listen = "0.0.0.0:443"
+
+# Path to your TLS certificate and private key.
+# Make sure to generate these and place them on your server.
+tls_cert = "/etc/trusttunnel/server.crt"
+tls_key = "/etc/trusttunnel/server.key"
+
+# --- Authentication Section ---
+[authentication]
+# Use the registry-based authenticator we modified.
+type = "registry_based"
+
+# Maximum number of concurrent devices per user.
+# This is the new setting we added!
+max_devices = 7
+
+# List of users and their passwords.
+# You can add as many users as you like here.
+clients = [
+    { username = "vasya", password = "some_strong_password" },
+    { username = "petya", password = "another_secret" },
+]
+'''
