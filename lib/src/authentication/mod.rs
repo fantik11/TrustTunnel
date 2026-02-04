@@ -2,6 +2,8 @@ pub mod registry_based;
 
 use crate::log_utils;
 use std::borrow::Cow;
+use std::sync::Arc;
+use tokio::sync::Notify;
 
 /// Authentication request source
 #[derive(Debug, Clone, PartialEq)]
@@ -13,11 +15,17 @@ pub enum Source<'this> {
     ProxyBasic(Cow<'this, str>),
 }
 
+/// A marker trait for session guards
+pub trait SessionGuard: Send + Sync + 'static {}
+impl SessionGuard for () {}
+
 /// Authentication procedure status
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub enum Status {
-    /// Success
-    Pass,
+    /// Success. Carries:
+    /// 1. A session guard (RAII): the session is considered active as long as this is alive.
+    /// 2. A kill signal: the tunnel should terminate itself if this Notify is triggered.
+    Pass(Arc<dyn SessionGuard>, Arc<Notify>),
     /// Failure
     Reject,
 }
